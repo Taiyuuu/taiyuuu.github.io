@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>mathOS Documentation</title>
+    <style>
+        * { scrollbar-width: none; -ms-overflow-style: none; box-sizing: border-box; }
+        *::-webkit-scrollbar { display: none; }
+
+        body {
+            margin: 0; padding: 0;
+            background: #000; color: #eee;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 60px 20px;
+        }
+
+        header {
+            border-bottom: 1px solid #222;
+            padding-bottom: 40px;
+            margin-bottom: 60px;
+        }
+
+        h1 { font-size: 48px; font-weight: 700; margin: 0; letter-spacing: -1px; }
+        h2 { font-size: 28px; color: #007aff; margin-top: 50px; border-bottom: 1px solid #222; padding-bottom: 10px; }
+        h3 { font-size: 20px; color: #fff; margin-top: 30px; }
+
+        p { color: #a1a1a6; font-size: 17px; }
+        code { 
+            background: #1c1c1e; 
+            padding: 2px 6px; 
+            border-radius: 4px; 
+            font-family: "SF Mono", Menlo, monospace; 
+            font-size: 14px;
+            color: #ff3b30;
+        }
+
+        .card {
+            background: #1c1c1e;
+            border: 1px solid #2c2c2e;
+            border-radius: 18px;
+            padding: 24px;
+            margin-top: 20px;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+
+        .badge {
+            display: inline-block;
+            background: #007aff;
+            color: white;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            vertical-align: middle;
+            margin-left: 10px;
+        }
+
+        ul { padding-left: 20px; color: #a1a1a6; }
+        li { margin-bottom: 10px; }
+
+        .shortcut {
+            background: #3a3a3c;
+            padding: 2px 8px;
+            border-radius: 6px;
+            color: #fff;
+            font-size: 13px;
+            font-weight: 600;
+            border-bottom: 2px solid #000;
+        }
+
+        footer {
+            margin-top: 100px;
+            text-align: center;
+            color: #444;
+            font-size: 12px;
+            padding-bottom: 40px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>mathOS <span style="font-weight: 300; color: #888;">Documentation</span></h1>
+        <p>A sophisticated mathematical desktop environment built for speed, clarity, and advanced computation.</p>
+    </header>
+
+    <section id="system">
+        <h2>System Overview</h2>
+        <p>mathOS provides a windowed multitasking environment inspired by macOS. It manages a suite of specialized tools within a unified workspace.</p>
+        
+        <div class="feature-grid">
+            <div class="card">
+                <h3>Dynamic Dock</h3>
+                <p>Launch and manage applications. Features include icon jumping on launch, drag-to-reorder, and context menus for window management.</p>
+            </div>
+            <div class="card">
+                <h3>Mission Control</h3>
+                <p>Click the desktop background to see all open windows at once. Organize your workflow across multiple virtual desktops.</p>
+            </div>
+            <div class="card">
+                <h3>Omni Search</h3>
+                <p>Use the search bar in the Calculator title bar to instantly find and launch any tool in the mathOS library.</p>
+            </div>
+        </div>
+    </section>
+
+    <section id="calculator">
+        <h2>The Calculator <span class="badge">Core</span></h2>
+        <p>The central hub of mathOS. It uses MathJax for high-fidelity LaTeX rendering and Math.js for precise calculations.</p>
+        
+        <h3>Key Features</h3>
+        <ul>
+            <li><strong>Scientific Mode:</strong> Toggle via the <span class="shortcut">⌘</span> button to access advanced trigonometry, calculus, and memory functions.</li>
+            <li><strong>Ghost Brackets:</strong> Visually balances parentheses in real-time. Use <span class="shortcut">→</span> to auto-close brackets.</li>
+            <li><strong>Memory:</strong> Use <code>mc</code>, <code>m+</code>, <code>m-</code>, and <code>mr</code> to manage stored constants across calculations.</li>
+            <li><strong>Precision:</strong> Computes up to 14 decimal places of accuracy.</li>
+        </ul>
+    </section>
+
+    <section id="ai">
+        <h2>AI Assistant <span class="badge">Gemini</span></h2>
+        <p>A specialized interface for the Google Gemini API, integrated directly into the workspace.</p>
+        
+        <div class="card">
+            <h3>Setup</h3>
+            <p>To use the AI Assistant, paste your <strong>Gemini API Key</strong> in the toolbar. This key is stored securely in your browser's <code>localStorage</code>.</p>
+        </div>
+
+        <h3>Advanced Interactions</h3>
+        <ul>
+            <li><strong>Model Switching:</strong> Switch between <code>Gemini 1.5 Flash</code> for speed and <code>Gemini 1.5 Pro</code> for complex reasoning.</li>
+            <li><strong>Context Awareness:</strong> The assistant remembers previous messages in the current session for multi-turn conversations.</li>
+            <li><strong>Visual Feedback:</strong> Features a custom "Thinking" animation and gradual text reveal for a more natural interaction flow.</li>
+        </ul>
+    </section>
+
+    <section id="tools">
+        <h2>The Tool Suite</h2>
+        <p>Every tool in mathOS is a standalone application that communicates with the core system.</p>
+        
+        <div class="card">
+            <table style="width: 100%; border-collapse: collapse; text-align: left;">
+                <thead>
+                    <tr style="color: #fff; border-bottom: 1px solid #333;">
+                        <th style="padding: 10px;">Tool</th>
+                        <th style="padding: 10px;">Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td style="padding: 10px; color: #007aff;">Grapher</td>
+                        <td style="padding: 10px;">2D function plotting with interactive zooming.</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 10px; color: #007aff;">Matrix Calc</td>
+                        <td style="padding: 10px;">Linear algebra toolkit for row reduction and determinants.</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 10px; color: #007aff;">Unit Converter</td>
+                        <td style="padding: 10px;">Instant conversion across dozens of physical units.</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 10px; color: #007aff;">Timezones</td>
+                        <td style="padding: 10px;">Global map with real-time day/night cycles and city clocks.</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 10px; color: #007aff;">Periodic Table</td>
+                        <td style="padding: 10px;">Interactive chemical element reference.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section id="shortcuts">
+        <h2>Keyboard Shortcuts</h2>
+        <div class="card">
+            <ul style="list-style: none; padding: 0;">
+                <li><span class="shortcut">Enter</span> Evaluate current expression</li>
+                <li><span class="shortcut">Esc</span> Clear display (AC)</li>
+                <li><span class="shortcut">Shift</span> Toggle 2nd/inverse functions in Scientific mode</li>
+                <li><span class="shortcut">Backspace</span> Delete last character / token</li>
+                <li><span class="shortcut">Arrow Right</span> Auto-complete parentheses</li>
+            </ul>
+        </div>
+    </section>
+
+    <footer>
+        mathOS Environment &copy; 2024 • Designed for Better Calculator
+    </footer>
+</div>
+
+<script>
+    // Smooth scrolling for internal links if added later
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', function (e) {
+            e.preventDefault();
+            document.querySelector(this.getAttribute('href')).scrollIntoView({
+                behavior: 'smooth'
+            });
+        });
+    });
+</script>
+
+</body>
+</html>
