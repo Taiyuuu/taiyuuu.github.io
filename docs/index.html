@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Documentation Hub</title>
+    <style>
+        * { scrollbar-width: none; -ms-overflow-style: none; box-sizing: border-box; }
+        *::-webkit-scrollbar { display: none; }
+
+        body {
+            margin: 0; padding: 0;
+            background: #000; color: #eee;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1000px;
+            width: 100%;
+            padding: 40px;
+            text-align: center;
+        }
+
+        header {
+            margin-bottom: 80px;
+        }
+
+        h1 { font-size: 56px; font-weight: 700; margin: 0; letter-spacing: -2px; }
+        p.subtitle { color: #8e8e93; font-size: 20px; margin-top: 10px; }
+
+        .hub-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+        }
+
+        .hub-card {
+            background: #1c1c1e;
+            border: 1px solid #2c2c2e;
+            border-radius: 30px;
+            padding: 50px 30px;
+            text-decoration: none;
+            color: inherit;
+            transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hub-card:hover {
+            transform: scale(1.02) translateY(-5px);
+            border-color: #007aff;
+            background: #252528;
+        }
+
+        .hub-card .icon {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 25px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #2c2c2e;
+            border-radius: 20px;
+            font-size: 32px;
+            transition: background 0.3s;
+        }
+
+        .hub-card:hover .icon {
+            background: #007aff;
+        }
+
+        .hub-card h2 { font-size: 28px; margin: 0; font-weight: 600; }
+        .hub-card p { color: #a1a1a6; margin-top: 15px; font-size: 16px; }
+
+        .badge {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: #3a3a3c;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: #8e8e93;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>Documentation Hub</h1>
+        <p class="subtitle">Select a project to explore its technical specifications.</p>
+    </header>
+
+    <div class="hub-grid">
+        <a href="mathOS/" class="hub-card">
+            <div class="badge">System</div>
+            <div class="icon">∑</div>
+            <h2>mathOS</h2>
+            <p>Mathematical desktop environment with advanced computing tools.</p>
+        </a>
+
+        <a href="Eco-Budgeter/" class="hub-card">
+            <div class="badge">Service</div>
+            <div class="icon">₵</div>
+            <h2>Eco-Budgeter</h2>
+            <p>Ecologically conscious financial planning and budget management.</p>
+        </a>
+    </div>
+</div>
+
+</body>
+</html>
