@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>404 - Page Not Found</title>
+    <style>
+        * { box-sizing: border-box; }
+        
+        body {
+            margin: 0; padding: 0;
+            background: #000;
+            color: #eee;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .window {
+            width: 450px;
+            background: #1d1d1e;
+            border-radius: 24px;
+            border: 1px solid #252528;
+            padding: 24px;
+            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.6);
+            text-align: center;
+            animation: revealDown 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+        }
+
+        .traffic {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+
+        .dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .red { background: #ff5b60; }
+        .yellow { background: #fac803; }
+        .green { background: #28c840; }
+
+        .error-img {
+            width: 280px;
+            height: auto;
+            margin-bottom: 20px;
+        }
+
+        p {
+            color: #8e8e93;
+            font-size: 17px;
+            margin: 10px 0 30px 0;
+        }
+
+        .btn-home {
+            display: inline-block;
+            background: #007aff;
+            color: white;
+            text-decoration: none;
+            padding: 12px 32px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 15px;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .btn-home:hover {
+            background: #0a84ff;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0, 122, 255, 0.3);
+        }
+
+        @keyframes revealDown {
+            from { opacity: 0; transform: translateY(-20px) scale(0.95); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+    </style>
+</head>
+<body>
+
+<div class="window">
+    <div class="traffic">
+        <div class="dot red"></div>
+        <div class="dot yellow"></div>
+        <div class="dot green"></div>
+    </div>
+    <img src="404.png" alt="404" class="error-img">
+    <p>The page you are looking for has been moved or doesn't exist.</p>
+    <a href="https://taiyuuu.github.io/docs" class="btn-home">Return to Home</a>
+</div>
+
+</body>
+</html>
