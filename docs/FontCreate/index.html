@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Font Studio Documentation</title>
+    <style>
+        * { scrollbar-width: none; -ms-overflow-style: none; box-sizing: border-box; }
+        *::-webkit-scrollbar { display: none; }
+
+        body {
+            margin: 0; padding: 0;
+            background: #000; color: #eee;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 60px 20px;
+        }
+
+        header {
+            border-bottom: 1px solid #222;
+            padding-bottom: 40px;
+            margin-bottom: 60px;
+        }
+
+        h1 { font-size: 48px; font-weight: 700; margin: 0; letter-spacing: -1px; }
+        h2 { font-size: 28px; color: #ff9f0a; margin-top: 50px; border-bottom: 1px solid #222; padding-bottom: 10px; }
+        h3 { font-size: 20px; color: #fff; margin-top: 30px; }
+
+        p { color: #a1a1a6; font-size: 17px; }
+        code { 
+            background: #1c1c1e; 
+            padding: 2px 6px; 
+            border-radius: 4px; 
+            font-family: "SF Mono", Menlo, monospace; 
+            font-size: 14px;
+            color: #ff9f0a;
+        }
+
+        .card {
+            background: #1c1c1e;
+            border: 1px solid #2c2c2e;
+            border-radius: 18px;
+            padding: 24px;
+            margin-top: 20px;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+
+        .badge {
+            display: inline-block;
+            background: #ff9f0a;
+            color: white;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            vertical-align: middle;
+            margin-left: 10px;
+        }
+
+        ul { padding-left: 20px; color: #a1a1a6; }
+        li { margin-bottom: 10px; }
+
+        .btn-launch {
+            display: inline-block;
+            margin-top: 20px;
+            background: #ff9f0a;
+            color: white;
+            text-decoration: none;
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 15px;
+            transition: 0.2s;
+        }
+        .btn-launch:hover { background: #ff9f0a; transform: translateY(-2px); }
+
+        .btn-home {
+            display: inline-block;
+            margin-top: 20px;
+            margin-right: 12px;
+            background: #2c2c2e;
+            color: #eee;
+            text-decoration: none;
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 15px;
+            transition: 0.2s;
+        }
+        .btn-home:hover { background: #3a3a3c; transform: translateY(-2px); }
+
+        table { width: 100%; border-collapse: collapse; text-align: left; }
+        th, td { padding: 12px; border-bottom: 1px solid #2c2c2e; }
+        th { color: #fff; font-weight: 600; }
+
+        footer {
+            margin-top: 100px;
+            text-align: center;
+            color: #444;
+            font-size: 12px;
+            padding-bottom: 40px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>Font Studio <span style="font-weight: 300; color: #888;">Documentation</span></h1>
+        <p>A web-based vector handwriting capture studio designed to compile functional OpenType fonts from human touch inputs.</p>
+        <a href="https://taiyuuu.github.io/docs" class="btn-home">Return to Home</a>
+        <a href="https://taiyuuu.github.io/FontCreate" class="btn-launch">Launch Font Studio</a>
+    </header>
+
+    <section id="overview">
+        <h2>Studio Overview</h2>
+        <p>Font Studio provides a unified vector workspace optimized for drawing digitizer strokes. It bridges raw user inputs with programmatic font-face generation.</p>
+        
+        <div class="feature-grid">
+            <div class="card">
+                <h3>Categorized Grids</h3>
+                <p>Track coverage effortlessly. Includes mapped sections for Latin casing, numbers, punctuations, typography quotes, and math currencies.</p>
+            </div>
+            <div class="card">
+                <h3>Live Sandbox</h3>
+                <p>Test out your script instantly. Real-time buffers recompile and inject localized font-faces to test kerning and metrics on-the-fly.</p>
+            </div>
+            <div class="card">
+                <h3>Slate Customizer</h3>
+                <p>Fine-tune your workbench with scaling configurations and guide opacity selectors tailored for precise stylus tracking.</p>
+            </div>
+        </div>
+    </section>
+
+    <section id="alternator">
+        <h2>The Alternator Loop <span class="badge">Engine</span></h2>
+        <p>The heart of Font Studio's realism engine. It implements a pseudo-contextual glyph selector to replicate the organic visual randomness of human handwriting.</p>
+        
+        <h3>Key Dynamics</h3>
+        <ul>
+            <li><strong>Cycle Matrix:</strong> Tracks repeating keys. The sandbox cycles inputs sequentially across three variants: Standard, <code>.alt1</code>, and <code>.alt2</code>.</li>
+            <li><strong>Fallback Intercept:</strong> Seamless safety routing. If a designated alternative has not yet been drawn, the layout naturally drops back to basic glyph indexes.</li>
+            <li><strong>PUA Mapping:</strong> Standard sets map directly to traditional character positions, while extended structural alternates occupy the font's Private Use Area (<code>0xE000</code>).</li>
+        </ul>
+    </section>
+
+    <section id="pipeline">
+        <h2>Vector Pipeline <span class="badge">opentype</span></h2>
+        <p>The translation mechanism converts single-width mouse or stylus lines into renderable typography solids.</p>
+        
+        <div class="card">
+            <h3>Ribbon Transformation Mesh</h3>
+            <p>Because mathematical points hold zero stroke width in standard OpenType structures, raw inputs are run through a specialized geometry thickener (<code>generateRibbonPath</code>). The algorithm projects double outward offsets perpendicular to line segments via normal angles to create closed-path vector boundaries.</p>
+        </div>
+    </section>
+
+    <section id="specs">
+        <h2>Technical Matrix</h2>
+        <p>Platform architecture boundaries and metadata processing constraints.</p>
+        
+        <div class="card">
+            <table>
+                <thead>
+                    <tr style="border-bottom: 1px solid #333;">
+                        <th>Metric Segment</th>
+                        <th>Value Mapping</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td style="color: #ff9f0a;">Target Standard</td>
+                        <td>Units Per Em: <code>1000</code></td>
+                    </tr>
+                    <tr>
+                        <td style="color: #ff9f0a;">Vertical Bounds</td>
+                        <td>Ascender: <code>850</code> | Descender: <code>-150</code></td>
+                    </tr>
+                    <tr>
+                        <td style="color: #ff9f0a;">Baseline Target</td>
+                        <td>80% Offset from Canvas Vector Bounds</td>
+                    </tr>
+                    <tr>
+                        <td style="color: #ff9f0a;">Local State Store</td>
+                        <td>JSON Stringification to browser <code>localStorage</code></td>
+                    </tr>
+                    <tr>
+                        <td style="color: #ff9f0a;">External Framework</td>
+                        <td><code>opentype.js</code> (Core compilation compiler engine)</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <footer>
+        Font Studio Environment &copy; 2026 • Designed for Custom Typography Production
+    </footer>
+</div>
+
+<script>
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', function (e) {
+            e.preventDefault();
+            document.querySelector(this.getAttribute('href')).scrollIntoView({
+                behavior: 'smooth'
+            });
+        });
+    });
+</script>
+
+</body>
+</html>
