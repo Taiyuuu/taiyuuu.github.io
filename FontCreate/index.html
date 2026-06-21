@@ -1,0 +1,1298 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Font Studio — Vector Handwriting Engine</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/opentype.js/1.3.4/opentype.min.js"></script>
+
+    <style>
+        * {
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+            box-sizing: border-box;
+        }
+
+        *::-webkit-scrollbar {
+            display: none;
+        }
+
+        body {
+            background-color: #000000;
+            color: #eee;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+        }
+
+        .screen {
+            display: none;
+            width: 100%;
+        }
+
+        .screen.active {
+            display: flex;
+            flex-direction: column;
+        }
+
+        canvas {
+            display: block;
+            touch-action: none;
+            cursor: crosshair;
+        }
+
+        /* ── Toast / Popup ── */
+        #toastContainer {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            pointer-events: none;
+        }
+
+        .toast {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 13px 20px;
+            border-radius: 14px;
+            font-size: 13px;
+            font-weight: 600;
+            backdrop-filter: blur(16px);
+            border: 1px solid;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            pointer-events: auto;
+            animation: toastIn 0.3s cubic-bezier(.34, 1.56, .64, 1) both;
+            max-width: 480px;
+            text-align: center;
+        }
+
+        .toast.info {
+            background: rgba(24, 24, 27, 0.92);
+            border-color: rgba(113, 113, 122, 0.4);
+            color: #e4e4e7;
+        }
+
+        .toast.success {
+            background: rgba(5, 46, 22, 0.92);
+            border-color: rgba(134, 239, 172, 0.3);
+            color: #86efac;
+        }
+
+        .toast.warn {
+            background: rgba(69, 26, 3, 0.92);
+            border-color: rgba(251, 146, 60, 0.35);
+            color: #fb923c;
+        }
+
+        .toast.error {
+            background: rgba(69, 10, 10, 0.92);
+            border-color: rgba(248, 113, 113, 0.3);
+            color: #f87171;
+        }
+
+        .toast.leaving {
+            animation: toastOut 0.25s ease forwards;
+        }
+
+        @keyframes toastIn {
+            from {
+                opacity: 0;
+                transform: translateY(12px) scale(0.95);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        @keyframes toastOut {
+            from {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+
+            to {
+                opacity: 0;
+                transform: translateY(8px) scale(0.95);
+            }
+        }
+
+        /* ── Modal overlay ── */
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(6px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 8888;
+            animation: fadeIn 0.18s ease both;
+        }
+
+        .modal-backdrop.closing {
+            animation: fadeOut 0.18s ease forwards;
+        }
+
+        .modal-box {
+            background: #18181b;
+            border: 1px solid rgba(113, 113, 122, 0.35);
+            border-radius: 20px;
+            padding: 28px 28px 24px;
+            width: 100%;
+            max-width: 420px;
+            box-shadow: 0 24px 64px rgba(0, 0, 0, 0.7);
+            animation: scaleIn 0.22s cubic-bezier(.34, 1.56, .64, 1) both;
+        }
+
+        .modal-backdrop.closing .modal-box {
+            animation: scaleOut 0.18s ease forwards;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0
+            }
+
+            to {
+                opacity: 1
+            }
+        }
+
+        @keyframes fadeOut {
+            from {
+                opacity: 1
+            }
+
+            to {
+                opacity: 0
+            }
+        }
+
+        @keyframes scaleIn {
+            from {
+                opacity: 0;
+                transform: scale(0.94)
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1)
+            }
+        }
+
+        @keyframes scaleOut {
+            from {
+                opacity: 1;
+                transform: scale(1)
+            }
+
+            to {
+                opacity: 0;
+                transform: scale(0.94)
+            }
+        }
+
+        .modal-label {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            color: #71717a;
+            margin-bottom: 6px;
+        }
+
+        .modal-input {
+            width: 100%;
+            background: #09090b;
+            border: 1px solid #3f3f46;
+            border-radius: 10px;
+            padding: 9px 12px;
+            color: #e4e4e7;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.15s;
+        }
+
+        .modal-input:focus {
+            border-color: rgba(249, 115, 22, 0.5);
+        }
+
+        /* ── Confirm modal ── */
+        #confirmModal .modal-box {
+            max-width: 380px;
+        }
+
+        /* ── Preview loading dots ── */
+        .preview-dots {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        .preview-dots span {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #f97316;
+            animation: dotPulse 1.2s ease-in-out infinite;
+        }
+        .preview-dots span:nth-child(1) { animation-delay: 0s; }
+        .preview-dots span:nth-child(2) { animation-delay: 0.2s; }
+        .preview-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes dotPulse {
+            0%, 80%, 100% { background: #3f3f46; transform: scale(0.85); }
+            40%            { background: #f97316; transform: scale(1.15); }
+        }
+    </style>
+</head>
+
+<body class="min-h-screen antialiased selection:bg-orange-500/30 selection:color-orange-400">
+
+    <div id="mainMenuScreen" class="screen active max-w-5xl mx-auto px-4 py-8 md:py-12">
+        <header
+            class="flex flex-col md:flex-row md:items-center md:justify-between border-b border-zinc-800 pb-6 mb-8 gap-4">
+            <div class="flex items-center gap-4">
+                <div
+                    class="w-12 h-12 rounded-xl bg-gradient-to-tr from-orange-600 to-amber-500 flex items-center justify-center shadow-lg shadow-orange-500/20">
+                    <i data-lucide="type" class="w-6 h-6 text-white"></i>
+                </div>
+                <div>
+                    <h1 class="text-3xl font-bold tracking-tight text-white">Font Studio</h1>
+                    <p class="text-zinc-400 text-sm mt-0.5">Vector engine transforming human touch paths into functional
+                        OpenType sets.</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <button onclick="exportProjectData()"
+                    class="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-zinc-800 bg-zinc-900/50 hover:bg-zinc-800/80 text-zinc-300 text-sm font-medium transition active:scale-95">
+                    <i data-lucide="download-cloud" class="w-4 h-4 text-orange-400"></i> Export Project
+                </button>
+                <label
+                    class="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-orange-500/30 bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 text-sm font-medium cursor-pointer transition active:scale-95">
+                    <i data-lucide="upload-cloud" class="w-4 h-4"></i> Import Project
+                    <input type="file" accept=".json" class="hidden" onchange="importProjectData(event)">
+                </label>
+            </div>
+        </header>
+
+        <div class="bg-zinc-900/60 border border-zinc-800 rounded-2xl p-6 mb-8 shadow-xl backdrop-blur-sm">
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center gap-2 text-zinc-300 font-semibold text-sm">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-orange-400"></i> Real-time Alternative Variant Loop
+                    Sandbox
+                </div>
+                <div class="flex items-center gap-2">
+                    <!-- Settings button -->
+                    <div class="relative">
+                        <button id="settingsToggleBtn" onclick="toggleSettingsPopup(event)"
+                            class="flex items-center gap-2 px-3 py-2 border border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white text-sm rounded-xl transition active:scale-95">
+                            <i data-lucide="settings-2" class="w-4 h-4"></i>
+                        </button>
+                        <!-- Settings popup -->
+                        <div id="settingsPopup"
+                            class="hidden absolute right-0 top-full mt-2 w-72 bg-zinc-900 border border-zinc-700 rounded-2xl shadow-2xl shadow-black/60 p-4 z-50 backdrop-blur-sm"
+                            onclick="event.stopPropagation()">
+                            <div class="text-xs font-bold uppercase tracking-widest text-zinc-500 mb-4">Preview Settings</div>
+                            <!-- Stroke weight -->
+                            <div class="mb-4">
+                                <div class="flex items-center justify-between mb-2">
+                                    <div class="flex items-center gap-1.5">
+                                        <i data-lucide="pen-line" class="w-3.5 h-3.5 text-zinc-500"></i>
+                                        <span class="text-xs text-zinc-400 font-medium">Stroke Weight</span>
+                                    </div>
+                                    <span id="strokeWeightLabel" class="text-xs text-orange-400 font-mono">45</span>
+                                </div>
+                                <input id="strokeWeightSlider" type="range" min="10" max="100" value="45" step="1"
+                                    oninput="onStrokeWeightChange(this.value)"
+                                    class="w-full accent-orange-500 cursor-pointer h-1" />
+                            </div>
+                            <!-- Character spacing -->
+                            <div class="mb-4">
+                                <div class="flex items-center justify-between mb-2">
+                                    <div class="flex items-center gap-1.5">
+                                        <i data-lucide="letter-text" class="w-3.5 h-3.5 text-zinc-500"></i>
+                                        <span class="text-xs text-zinc-400 font-medium">Letter Spacing</span>
+                                    </div>
+                                    <span id="letterSpacingLabel" class="text-xs text-orange-400 font-mono">0em</span>
+                                </div>
+                                <input id="letterSpacingSlider" type="range" min="-0.1" max="0.5" value="0" step="0.01"
+                                    oninput="onLetterSpacingChange(this.value)"
+                                    class="w-full accent-orange-500 cursor-pointer h-1" />
+                            </div>
+                            <!-- Preview font size -->
+                            <div>
+                                <div class="flex items-center justify-between mb-2">
+                                    <div class="flex items-center gap-1.5">
+                                        <i data-lucide="a-large-small" class="w-3.5 h-3.5 text-zinc-500"></i>
+                                        <span class="text-xs text-zinc-400 font-medium">Preview Size</span>
+                                    </div>
+                                    <span id="previewSizeLabel" class="text-xs text-orange-400 font-mono">30px</span>
+                                </div>
+                                <input id="previewSizeSlider" type="range" min="12" max="96" value="30" step="1"
+                                    oninput="onPreviewSizeChange(this.value)"
+                                    class="w-full accent-orange-500 cursor-pointer h-1" />
+                            </div>
+                        </div>
+                    </div>
+                    <button onclick="exportFont()"
+                        class="flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-black font-semibold text-sm rounded-xl transition shadow-lg shadow-orange-500/10 active:scale-95">
+                        <i data-lucide="file-output" class="w-4 h-4 stroke-[2.5]"></i> Export .OTF File
+                    </button>
+                </div>
+            </div>
+            <textarea id="fontPreviewInput"
+                class="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-zinc-300 placeholder-zinc-600 focus:outline-none focus:border-orange-500/50 focus:ring-1 focus:ring-orange-500/50 text-sm transition"
+                rows="3"
+                oninput="updatePreviewText()">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</textarea>
+
+            <div id="fontPreviewRender"
+                class="w-full mt-4 bg-zinc-950 border border-dashed border-zinc-800 text-orange-400 p-5 rounded-xl font-medium text-center word-wrap break-word min-h-[90px] flex items-center justify-center transition"
+                style="font-size:30px;letter-spacing:0em;">
+                Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et
+                dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip
+                ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu
+                fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia
+                deserunt mollit anim id est laborum.
+            </div>
+        </div>
+
+        <div class="bg-zinc-900/40 border border-zinc-800/80 rounded-2xl p-6">
+            <div
+                class="flex items-center gap-2 text-zinc-400 text-sm mb-6 pb-4 border-b border-zinc-800/60 justify-center">
+                <i data-lucide="pointer" class="w-4 h-4 text-orange-400"></i> Tap a glyph placeholder block below to
+                draw character structural offsets.
+            </div>
+
+            <div class="space-y-8">
+                <div>
+                    <div class="flex items-center gap-2 font-bold text-xs uppercase tracking-wider text-zinc-500 mb-3">
+                        <i data-lucide="case-lower" class="w-4 h-4"></i> Lowercase Letters
+                    </div>
+                    <div class="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-12 gap-2" id="lowercaseGrid"></div>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2 font-bold text-xs uppercase tracking-wider text-zinc-500 mb-3">
+                        <i data-lucide="case-upper" class="w-4 h-4"></i> Uppercase Letters
+                    </div>
+                    <div class="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-12 gap-2" id="uppercaseGrid"></div>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2 font-bold text-xs uppercase tracking-wider text-zinc-500 mb-3">
+                        <i data-lucide="binary" class="w-4 h-4"></i> Numbers
+                    </div>
+                    <div class="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-12 gap-2" id="numbersGrid"></div>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2 font-bold text-xs uppercase tracking-wider text-zinc-500 mb-3">
+                        <i data-lucide="help-circle" class="w-4 h-4"></i> Punctuation & Brackets
+                    </div>
+                    <div class="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-12 gap-2" id="punctuationGrid"></div>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2 font-bold text-xs uppercase tracking-wider text-zinc-500 mb-3">
+                        <i data-lucide="languages" class="w-4 h-4 text-xs"></i> Accents (Lowercase)
+                    </div>
+                    <div class="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-12 gap-2" id="accentsLowerGrid"></div>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2 font-bold text-xs uppercase tracking-wider text-zinc-500 mb-3">
+                        <i data-lucide="languages" class="w-4 h-4 text-xs"></i> Accents (Uppercase)
+                    </div>
+                    <div class="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-12 gap-2" id="accentsUpperGrid"></div>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2 font-bold text-xs uppercase tracking-wider text-zinc-500 mb-3">
+                        <i data-lucide="quote" class="w-4 h-4"></i> Typography Quotes & Signs
+                    </div>
+                    <div class="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-12 gap-2" id="typographyGrid"></div>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2 font-bold text-xs uppercase tracking-wider text-zinc-500 mb-3">
+                        <i data-lucide="coins" class="w-4 h-4"></i> Currencies & Mathematics
+                    </div>
+                    <div class="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-12 gap-2" id="mathCurrencyGrid"></div>
+                </div>
+            </div>
+
+            <div class="mt-12 pt-6 border-t border-zinc-800/80">
+                <button onclick="resetAllData()"
+                    class="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl border border-red-500/20 bg-red-500/10 hover:bg-red-500/20 text-red-400 font-semibold text-sm transition active:scale-[0.99]">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i> Wipe Project Directory & Reset Slate
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="editorScreen" class="screen max-w-2xl mx-auto px-4 py-8 items-center justify-center min-h-screen">
+        <div class="bg-zinc-900 border border-zinc-800 w-full rounded-2xl shadow-2xl p-6 flex flex-col items-center">
+
+            <header class="w-full flex flex-col items-center border-b border-zinc-800 pb-5 mb-6 text-center">
+                <div class="text-xs font-bold uppercase tracking-widest text-zinc-500 mb-1">Canvas Tracking Core</div>
+                <h2 id="editingTitle" class="text-2xl font-extrabold text-white">Character Variant Blueprint</h2>
+            </header>
+
+            <div class="w-full grid grid-cols-1 sm:flex items-center justify-between gap-4 mb-6">
+                <div class="flex items-center gap-2 w-full sm:w-auto">
+                    <button onclick="saveAndReturn()"
+                        class="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 bg-orange-500 hover:bg-orange-600 text-black font-semibold rounded-xl text-sm transition active:scale-95 shadow-lg shadow-orange-500/10">
+                        <i data-lucide="check" class="w-4 h-4 stroke-[3]"></i> Save
+                    </button>
+                    <button onclick="discardAndReturn()"
+                        class="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 border border-zinc-800 bg-zinc-950 hover:bg-zinc-800 text-zinc-400 rounded-xl text-sm transition active:scale-95">
+                        <i data-lucide="x" class="w-4 h-4"></i> Abort
+                    </button>
+                </div>
+
+                <div
+                    class="flex items-center bg-zinc-950 border border-zinc-800 p-1.5 rounded-xl justify-between sm:justify-start gap-3 w-full sm:w-auto">
+                    <button onclick="switchVariant(-1)"
+                        class="w-8 h-8 flex items-center justify-center border border-zinc-800 hover:border-zinc-700 bg-zinc-900 rounded-lg text-zinc-400 hover:text-white transition active:scale-90">
+                        <i data-lucide="chevron-left" class="w-4 h-4"></i>
+                    </button>
+                    <div class="text-xs font-bold text-orange-400 tracking-wider uppercase min-w-[90px] text-center"
+                        id="variantLabel">Standard</div>
+                    <button onclick="switchVariant(1)"
+                        class="w-8 h-8 flex items-center justify-center border border-zinc-800 hover:border-zinc-700 bg-zinc-900 rounded-lg text-zinc-400 hover:text-white transition active:scale-90">
+                        <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                    </button>
+                </div>
+
+                <button onclick="clearCanvas()"
+                    class="flex items-center justify-center gap-2 px-4 py-2.5 border border-red-500/20 bg-red-500/5 hover:bg-red-500/10 text-red-400 rounded-xl text-sm font-medium transition active:scale-95 w-full sm:w-auto">
+                    <i data-lucide="rotate-ccw" class="w-4 h-4"></i> Clear Matrix
+                </button>
+            </div>
+
+            <div
+                class="w-full bg-zinc-950/80 border border-zinc-800 p-4 rounded-xl mb-6 grid grid-cols-1 sm:grid-cols-2 gap-4 text-zinc-400 text-xs font-semibold">
+                <div class="flex flex-col gap-2">
+                    <div class="flex justify-between items-center px-1">
+                        <span>Workspace Scale Boundaries</span>
+                        <span id="sizeDisplayLabel" class="text-orange-400">500 x 500 px</span>
+                    </div>
+                    <input type="range" id="canvasSizeSlider" min="50" max="600" value="500" step="25"
+                        class="w-full accent-orange-500 cursor-pointer bg-zinc-800 rounded-lg h-1.5 appearance-none"
+                        oninput="resizeEditorCanvas(this.value)">
+                </div>
+                <div class="flex flex-col gap-2">
+                    <div class="flex justify-between items-center px-1">
+                        <span>Guideline Reference Opacity</span>
+                        <span id="opacityDisplayLabel" class="text-orange-400">20%</span>
+                    </div>
+                    <input type="range" id="referenceOpacitySlider" min="0" max="1" value="0.2" step="0.05"
+                        class="w-full accent-orange-500 cursor-pointer bg-zinc-800 rounded-lg h-1.5 appearance-none"
+                        oninput="updateOpacityLabel(this.value)">
+                </div>
+            </div>
+
+            <div id="canvas-container"
+                class="relative bg-white rounded-2xl shadow-inner border-4 border-zinc-950 max-w-full overflow-hidden transition-all duration-150">
+                <canvas id="paintCanvas" width="500" height="500"></canvas>
+            </div>
+
+            <div class="mt-4 flex items-center gap-2 text-zinc-500 text-xs font-medium">
+                <i data-lucide="info" class="w-3.5 h-3.5 text-orange-500/60"></i> Keep stylus paths smooth and drawn
+                within boundary frames.
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Toast Container ── -->
+    <div id="toastContainer"></div>
+
+    <!-- ── Export / Naming Modal ── -->
+    <div id="exportModal" class="modal-backdrop" style="display:none">
+        <div class="modal-box" onclick="event.stopPropagation()">
+            <div class="flex items-center gap-3 mb-5">
+                <div class="w-9 h-9 rounded-xl bg-orange-500/15 flex items-center justify-center">
+                    <i data-lucide="file-output" class="w-4 h-4 text-orange-400"></i>
+                </div>
+                <div>
+                    <div class="text-sm font-bold text-white" id="exportModalTitle">Export File</div>
+                    <div class="text-xs text-zinc-500" id="exportModalSub">Choose a filename for your export</div>
+                </div>
+            </div>
+
+            <div class="space-y-4">
+                <div>
+                    <div class="modal-label">Filename</div>
+                    <div class="flex items-center gap-2">
+                        <input id="exportFilenameInput" class="modal-input flex-1" type="text" placeholder="my-font" />
+                        <span id="exportFileExt"
+                            class="text-xs text-zinc-500 font-mono shrink-0 bg-zinc-900 border border-zinc-800 px-2.5 py-2 rounded-lg">.otf</span>
+                    </div>
+                </div>
+
+                <!-- OTF-only options -->
+                <div id="otfOptions" class="space-y-3">
+                    <div>
+                        <div class="modal-label">Family Name</div>
+                        <input id="exportFamilyName" class="modal-input" type="text" placeholder="My Handwriting" />
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <div class="modal-label">Style Name</div>
+                            <input id="exportStyleName" class="modal-input" type="text" placeholder="Regular" />
+                        </div>
+                        <div>
+                            <div class="modal-label">Designer</div>
+                            <input id="exportDesigner" class="modal-input" type="text" placeholder="Your Name" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex gap-3 mt-6">
+                <button onclick="closeExportModal()"
+                    class="flex-1 py-2.5 rounded-xl border border-zinc-800 bg-zinc-900 hover:bg-zinc-800 text-zinc-400 text-sm font-medium transition">Cancel</button>
+                <button onclick="confirmExport()"
+                    class="flex-1 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-black text-sm font-bold transition shadow-lg shadow-orange-500/20">Export</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Confirm Dialog Modal ── -->
+    <div id="confirmModal" class="modal-backdrop" style="display:none">
+        <div class="modal-box" onclick="event.stopPropagation()">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-9 h-9 rounded-xl bg-red-500/15 flex items-center justify-center" id="confirmModalIcon">
+                    <i data-lucide="alert-triangle" class="w-4 h-4 text-red-400"></i>
+                </div>
+                <div class="text-sm font-bold text-white" id="confirmModalTitle">Are you sure?</div>
+            </div>
+            <p class="text-sm text-zinc-400 mb-6" id="confirmModalMsg"></p>
+            <div class="flex gap-3">
+                <button onclick="resolveConfirm(false)"
+                    class="flex-1 py-2.5 rounded-xl border border-zinc-800 bg-zinc-900 hover:bg-zinc-800 text-zinc-400 text-sm font-medium transition">Cancel</button>
+                <button onclick="resolveConfirm(true)" id="confirmModalOkBtn"
+                    class="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-bold transition">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const lowercaseList = "abcdefghijklmnopqrstuvwxyz".split("");
+        const uppercaseList = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+        const numbersList = "0123456789".split("");
+        const punctuationList = [".", ",", ":", ";", "!", "?", "(", ")", "[", "]", "{", "}", "/", "\\", "|", "-", "_", "+", "=", "*", "&", "%", "$", "@", "#", "<", ">", "\"", "'", "^", "~"];
+        const accentsLowerList = "àáâäæçèéêëìíîïñòóôöùúûüß".split("");
+        const accentsUpperList = "ÀÁÂÄÆÇÈÉÊËÌÍÎÏÑÒÓÔÖÙÚÛÜ".split("");
+        const typographyList = ["“", "”", "‘", "’", "–", "—", "…", "©", "®", "™"];
+        const mathCurrencyList = ["€", "£", "¥", "¢", "÷", "×", "±", "°"];
+
+        const variantSuffixes = ["", ".alt1", ".alt2"];
+
+        let currentBaseChar = "a";
+        let currentVariantIndex = 0;
+        let drawing = false;
+        let currentPath = [];
+        let allGlyphs = {};
+        let sessionBackup = null;
+        let currentCanvasSize = 500;
+        let currentReferenceOpacity = 0.2;
+
+        let globalVariantUnicodeMap = {};
+
+        // ── Stroke Weight State ──
+        let currentStrokeWeight = 45;
+
+        const canvas = document.getElementById('paintCanvas');
+        const ctx = canvas.getContext('2d');
+
+        function buildGrids() {
+            setupGridButtons("lowercaseGrid", lowercaseList);
+            setupGridButtons("uppercaseGrid", uppercaseList);
+            setupGridButtons("numbersGrid", numbersList);
+            setupGridButtons("punctuationGrid", punctuationList);
+            setupGridButtons("accentsLowerGrid", accentsLowerList);
+            setupGridButtons("accentsUpperGrid", accentsUpperList);
+            setupGridButtons("typographyGrid", typographyList);
+            setupGridButtons("mathCurrencyGrid", mathCurrencyList);
+        }
+
+        function safeId(char) {
+            return btoa(encodeURIComponent(char)).replace(/[^a-zA-Z0-9]/g, '');
+        }
+
+        function setupGridButtons(containerId, charList) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = "";
+            charList.forEach(char => {
+                const btn = document.createElement("button");
+                btn.className = "group relative h-12 text-sm font-bold border border-zinc-800/80 bg-zinc-900/30 text-zinc-400 hover:text-white hover:border-orange-500/40 hover:bg-orange-500/5 rounded-xl transition flex items-center justify-center duration-150 active:scale-90 shadow-sm";
+                btn.innerText = char;
+                btn.onclick = () => openEditor(char);
+                btn.id = "btn-" + safeId(char);
+                container.appendChild(btn);
+            });
+        }
+
+        function updateMenuBadges() {
+            const allChars = [
+                ...lowercaseList, ...uppercaseList, ...numbersList,
+                ...punctuationList, ...accentsLowerList, ...accentsUpperList,
+                ...typographyList, ...mathCurrencyList
+            ];
+
+            allChars.forEach(char => {
+                let count = 0;
+                variantSuffixes.forEach(suffix => {
+                    if (allGlyphs[char + suffix] && allGlyphs[char + suffix].strokes && allGlyphs[char + suffix].strokes.length > 0) count++;
+                });
+
+                const btn = document.getElementById("btn-" + safeId(char));
+                if (btn) {
+                    if (count > 0) {
+                        btn.className = "group relative h-12 text-sm font-bold border border-orange-500/40 bg-orange-500/10 text-orange-400 rounded-xl transition flex items-center justify-center duration-150 active:scale-90 shadow-md shadow-orange-500/5";
+                        let badge = btn.querySelector(".badge-counter");
+                        if (!badge) {
+                            badge = document.createElement("span");
+                            badge.className = "badge-counter absolute top-1 right-1.5 text-[8px] px-1 bg-orange-500 text-black rounded font-black tracking-tighter leading-none h-3.5 flex items-center justify-center min-w-[12px]";
+                            btn.appendChild(badge);
+                        }
+                        badge.innerText = count;
+                    } else {
+                        btn.className = "group relative h-12 text-sm font-bold border border-zinc-800/80 bg-zinc-900/30 text-zinc-400 hover:text-white hover:border-orange-500/40 hover:bg-orange-500/5 rounded-xl transition flex items-center justify-center duration-150 active:scale-90 shadow-sm";
+                        const badge = btn.querySelector(".badge-counter");
+                        if (badge) badge.remove();
+                    }
+                }
+            });
+            updatePreviewText();
+        }
+
+        function openEditor(char) {
+            currentBaseChar = char;
+            currentVariantIndex = 0;
+            sessionBackup = JSON.parse(JSON.stringify(allGlyphs));
+            document.getElementById("mainMenuScreen").classList.remove("active");
+            document.getElementById("editorScreen").classList.add("active");
+            updateEditorUI();
+        }
+
+        function saveAndReturn() {
+            localStorage.setItem('myHandwritingGlyphs', JSON.stringify(allGlyphs));
+            document.getElementById("editorScreen").classList.remove("active");
+            document.getElementById("mainMenuScreen").classList.add("active");
+            updateMenuBadges();
+        }
+
+        function discardAndReturn() {
+            allGlyphs = JSON.parse(JSON.stringify(sessionBackup));
+            document.getElementById("editorScreen").classList.remove("active");
+            document.getElementById("mainMenuScreen").classList.add("active");
+            updateMenuBadges();
+        }
+
+        function updateEditorUI() {
+            document.getElementById("editingTitle").innerText = `Character Matrix: ${currentBaseChar}`;
+            let labelText = "Standard";
+            if (currentVariantIndex === 1) labelText = "Variant 1 (.alt1)";
+            if (currentVariantIndex === 2) labelText = "Variant 2 (.alt2)";
+            document.getElementById("variantLabel").innerText = labelText;
+            drawReference();
+        }
+
+        function switchVariant(direction) {
+            currentVariantIndex += direction;
+            if (currentVariantIndex < 0) currentVariantIndex = variantSuffixes.length - 1;
+            if (currentVariantIndex >= variantSuffixes.length) currentVariantIndex = 0;
+            updateEditorUI();
+        }
+
+        function resizeEditorCanvas(newSize) {
+            currentCanvasSize = parseInt(newSize);
+            canvas.width = currentCanvasSize;
+            canvas.height = currentCanvasSize;
+            document.getElementById("sizeDisplayLabel").innerText = `${currentCanvasSize} x ${currentCanvasSize} px`;
+            drawReference();
+        }
+
+        function updateOpacityLabel(value) {
+            currentReferenceOpacity = parseFloat(value);
+            document.getElementById("opacityDisplayLabel").innerText = `${Math.round(currentReferenceOpacity * 100)}%`;
+            drawReference();
+        }
+
+        function drawReference() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const baseline = currentCanvasSize * 0.8;
+            const capline = currentCanvasSize * 0.3;
+
+            ctx.strokeStyle = '#e4e4e7';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(0, baseline);
+            ctx.lineTo(currentCanvasSize, baseline);
+            ctx.moveTo(0, capline);
+            ctx.lineTo(currentCanvasSize, capline);
+            ctx.stroke();
+
+            if (currentReferenceOpacity > 0) {
+                ctx.fillStyle = `rgba(161, 161, 170, ${currentReferenceOpacity})`;
+                ctx.font = `${currentCanvasSize * 0.6}px sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'alphabetic';
+
+                let displayChar = currentBaseChar;
+                if (displayChar === 'a') displayChar = 'ɑ';
+                if (displayChar === 'g') displayChar = 'ɡ';
+                ctx.fillText(displayChar, canvas.width / 2, baseline);
+            }
+
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = Math.max(6, currentCanvasSize * 0.028);
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            const fullKey = currentBaseChar + variantSuffixes[currentVariantIndex];
+            if (allGlyphs[fullKey] && allGlyphs[fullKey].strokes) {
+                ctx.strokeStyle = '#ff9f0a';
+
+                const savedSize = allGlyphs[fullKey].canvasSize || 500;
+                const ratio = currentCanvasSize / savedSize;
+
+                allGlyphs[fullKey].strokes.forEach(stroke => {
+                    ctx.beginPath();
+                    stroke.forEach((pt, i) => {
+                        if (i === 0) ctx.moveTo(pt.x * ratio, pt.y * ratio);
+                        else ctx.lineTo(pt.x * ratio, pt.y * ratio);
+                    });
+                    ctx.stroke();
+                });
+                ctx.strokeStyle = '#000000';
+            }
+        }
+
+        function getCoords(e) {
+            const rect = canvas.getBoundingClientRect();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            return { x: clientX - rect.left, y: clientY - rect.top };
+        }
+
+        function startDrawing(e) {
+            drawing = true;
+            currentPath = [getCoords(e)];
+            ctx.beginPath();
+
+            ctx.lineWidth = Math.max(6, currentCanvasSize * 0.028);
+            ctx.moveTo(currentPath[0].x, currentPath[0].y);
+        }
+
+        function draw(e) {
+            if (!drawing) return;
+            e.preventDefault();
+            const coords = getCoords(e);
+            currentPath.push(coords);
+            ctx.lineTo(coords.x, coords.y);
+            ctx.stroke();
+        }
+
+        function stopDrawing() {
+            if (!drawing) return;
+            drawing = false;
+            const fullKey = currentBaseChar + variantSuffixes[currentVariantIndex];
+
+            if (!allGlyphs[fullKey] || !allGlyphs[fullKey].strokes) {
+                allGlyphs[fullKey] = {
+                    canvasSize: currentCanvasSize,
+                    strokes: []
+                };
+            } else if (allGlyphs[fullKey].canvasSize !== currentCanvasSize) {
+                const oldSize = allGlyphs[fullKey].canvasSize;
+                const scaleUp = currentCanvasSize / oldSize;
+                allGlyphs[fullKey].strokes = allGlyphs[fullKey].strokes.map(st =>
+                    st.map(pt => ({ x: pt.x * scaleUp, y: pt.y * scaleUp }))
+                );
+                allGlyphs[fullKey].canvasSize = currentCanvasSize;
+            }
+
+            allGlyphs[fullKey].strokes.push(currentPath);
+        }
+
+        canvas.addEventListener('mousedown', startDrawing);
+        canvas.addEventListener('mousemove', draw);
+        canvas.addEventListener('mouseup', stopDrawing);
+
+        canvas.addEventListener('touchstart', startDrawing);
+        canvas.addEventListener('touchmove', draw, { passive: false });
+        canvas.addEventListener('touchend', stopDrawing);
+
+        function clearCanvas() {
+            const fullKey = currentBaseChar + variantSuffixes[currentVariantIndex];
+            delete allGlyphs[fullKey];
+            drawReference();
+        }
+
+        function resetAllData() {
+            showConfirm(
+                'Wipe Project?',
+                'All recorded characters will be permanently deleted. An emergency backup will download first.',
+                'Wipe Everything'
+            ).then(confirmed => {
+                if (!confirmed) return;
+                _doExportJSON('font_studio_backup');
+                localStorage.removeItem('myHandwritingGlyphs');
+                allGlyphs = {};
+                buildGrids();
+                updateMenuBadges();
+                showToast('Project wiped and reset.', 'warn');
+            });
+        }
+
+        // ── Export helpers ──
+        let _pendingExportType = null; // 'json' | 'otf'
+
+        function _doExportJSON(filename) {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(allGlyphs));
+            const a = document.createElement('a');
+            a.href = dataStr;
+            a.download = (filename || 'font_studio_backup') + '.json';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+        }
+
+        function exportProjectData() {
+            openExportModal('json');
+        }
+
+        function importProjectData(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const hasCompletedGlyph = Object.values(allGlyphs).some(glyph => {
+                if (!glyph) return false;
+                if (Array.isArray(glyph)) return glyph.length > 0;
+                return glyph.strokes && glyph.strokes.length > 0;
+            });
+
+            if (hasCompletedGlyph) {
+                _doExportJSON('font_studio_backup');
+                showToast('Backup downloaded before import.', 'info');
+            }
+
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                try {
+                    const importedData = JSON.parse(e.target.result);
+                    allGlyphs = importedData;
+                    localStorage.setItem('myHandwritingGlyphs', JSON.stringify(allGlyphs));
+                    buildGrids();
+                    updateMenuBadges();
+                    showToast('Project imported successfully!', 'success');
+                } catch (err) {
+                    showToast('Import failed — invalid file format.', 'error');
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = '';
+        }
+
+        function generateRibbonPath(points, thickness) {
+            if (points.length < 2) return null;
+            const radius = thickness / 2;
+            const leftEdge = [];
+            const rightEdge = [];
+
+            // 1. Calculate left and right offset points along the stroke
+            for (let i = 0; i < points.length; i++) {
+                let pt = points[i];
+                let dx, dy;
+
+                if (i === 0) {
+                    dx = points[1].x - pt.x; dy = points[1].y - pt.y;
+                } else if (i === points.length - 1) {
+                    dx = pt.x - points[i - 1].x; dy = pt.y - points[i - 1].y;
+                } else {
+                    // Average direction at joints to keep width consistent
+                    dx = points[i + 1].x - points[i - 1].x;
+                    dy = points[i + 1].y - points[i - 1].y;
+                }
+
+                let len = Math.sqrt(dx * dx + dy * dy);
+                if (len === 0) { len = 1; dx = 1; dy = 0; }
+
+                let nx = -dy / len;
+                let ny = dx / len;
+
+                leftEdge.push({ x: pt.x + nx * radius, y: pt.y + ny * radius });
+                rightEdge.push({ x: pt.x - nx * radius, y: pt.y - ny * radius });
+            }
+
+            const path = new opentype.Path();
+
+            // 2. Trace the left side forward
+            path.moveTo(leftEdge[0].x, leftEdge[0].y);
+            for (let i = 1; i < leftEdge.length; i++) {
+                path.lineTo(leftEdge[i].x, leftEdge[i].y);
+            }
+
+            // 3. Connect to the right side and trace it backward
+            path.lineTo(rightEdge[rightEdge.length - 1].x, rightEdge[rightEdge.length - 1].y);
+            for (let i = rightEdge.length - 2; i >= 0; i--) {
+                path.lineTo(rightEdge[i].x, rightEdge[i].y);
+            }
+
+            // 4. Close the loop to form one solid continuous outline
+            path.closePath();
+            return path;
+        }
+
+        function compileFontEngine(opts) {
+            const strokeWeight = (opts && opts.strokeWeight != null) ? opts.strokeWeight : currentStrokeWeight;
+            const familyName = (opts && opts.familyName) ? opts.familyName : 'MyCustomHandwriting';
+            const styleName = (opts && opts.styleName) ? opts.styleName : 'Regular';
+            const designer = (opts && opts.designer) ? opts.designer : '';
+            // letterSpacing in em → convert to font units (1000 upm)
+            const letterSpacingEm = (opts && opts.letterSpacing != null) ? opts.letterSpacing : currentLetterSpacing;
+            const letterSpacingUnits = Math.round(letterSpacingEm * 1000);
+
+            const notdefGlyph = new opentype.Glyph({
+                name: '.notdef', unicode: 0, advanceWidth: 600, path: new opentype.Path()
+            });
+
+            const glyphs = [notdefGlyph];
+            let puaCounter = 0xE000;
+            globalVariantUnicodeMap = {};
+
+            for (let charKey in allGlyphs) {
+                const dataObj = allGlyphs[charKey];
+                if (!dataObj || !dataObj.strokes || dataObj.strokes.length === 0) continue;
+
+                const rawStrokes = dataObj.strokes;
+                const nativeCanvasWidth = dataObj.canvasSize || 500;
+
+                let minX = Infinity;
+                let maxX = -Infinity;
+
+                const fontScale = 1000 / nativeCanvasWidth;
+                const baselineShiftY = nativeCanvasWidth * 0.8;
+
+                const mappedStrokes = rawStrokes.map(stroke => {
+                    return stroke.map(pt => {
+                        const fx = pt.x * fontScale;
+                        const fy = (baselineShiftY - pt.y) * fontScale;
+                        if (fx < minX) minX = fx;
+                        if (fx > maxX) maxX = fx;
+                        return { x: fx, y: fy };
+                    });
+                });
+
+                if (minX === Infinity) { minX = 0; maxX = 500; }
+
+                const padding = 70;
+                const computedAdvanceWidth = Math.max(200, (maxX - minX) + (padding * 2) + letterSpacingUnits);
+                const shiftX = padding - minX;
+
+                const masterPath = new opentype.Path();
+
+                mappedStrokes.forEach(stroke => {
+                    let shifted = stroke.map(pt => ({ x: pt.x + shiftX, y: pt.y }));
+
+                    let filtered = [shifted[0]];
+                    for (let i = 1; i < shifted.length; i++) {
+                        let prev = filtered[filtered.length - 1];
+                        let curr = shifted[i];
+                        if (Math.hypot(curr.x - prev.x, curr.y - prev.y) > 8) {
+                            filtered.push(curr);
+                        }
+                    }
+
+                    if (filtered.length < 2 && shifted.length > 0) {
+                        let pt = shifted[0];
+                        filtered = [
+                            { x: pt.x - 3, y: pt.y - 3 },
+                            { x: pt.x + 3, y: pt.y + 3 }
+                        ];
+                    }
+
+                    if (filtered.length >= 2) {
+                        const ribbon = generateRibbonPath(filtered, strokeWeight);
+                        masterPath.extend(ribbon);
+                    }
+                });
+
+                const isAlt = charKey.includes('.alt');
+                const baseChar = isAlt ? charKey.split('.alt')[0] : charKey;
+
+                const unicodeVal = isAlt ? puaCounter++ : baseChar.charCodeAt(0);
+                globalVariantUnicodeMap[charKey] = unicodeVal;
+
+                let safeName = 'uni' + baseChar.charCodeAt(0).toString(16).padStart(4, '0').toUpperCase();
+                if (isAlt) safeName += '.alt' + charKey.split('.alt')[1];
+
+                const glyph = new opentype.Glyph({
+                    name: safeName,
+                    unicode: unicodeVal,
+                    advanceWidth: computedAdvanceWidth,
+                    path: masterPath
+                });
+
+                glyphs.push(glyph);
+            }
+
+            return new opentype.Font({
+                familyName: familyName,
+                styleName: styleName,
+                unitsPerEm: 1000,
+                ascender: 850,
+                descender: -150,
+                glyphs: glyphs
+            });
+        }
+
+        function showPreviewLoading(renderElement) {
+            renderElement.innerHTML = `<div class="preview-dots"><span></span><span></span><span></span></div>`;
+        }
+
+        function updatePreviewText() {
+            const inputElement = document.getElementById("fontPreviewInput");
+            const renderElement = document.getElementById("fontPreviewRender");
+
+            if (Object.keys(allGlyphs).length === 0) {
+                renderElement.style.fontFamily = "inherit";
+                renderElement.innerText = inputElement.value;
+                return;
+            }
+
+            showPreviewLoading(renderElement);
+
+            const tempFont = compileFontEngine();
+
+            try {
+                const fontArrayBuffer = tempFont.toArrayBuffer();
+                const blob = new Blob([fontArrayBuffer], { type: 'font/opentype' });
+                const fontUrl = URL.createObjectURL(blob);
+
+                let styleTag = document.getElementById('dynamic-preview-font');
+                if (!styleTag) {
+                    styleTag = document.createElement('style');
+                    styleTag.id = 'dynamic-preview-font';
+                    document.head.appendChild(styleTag);
+                }
+
+                styleTag.innerHTML = `
+                @font-face {
+                    font-family: 'MyLiveHandwriting';
+                    src: url('${fontUrl}') format('opentype');
+                }
+            `;
+
+                renderElement.style.fontFamily = "'MyLiveHandwriting', sans-serif";
+
+                const rawText = inputElement.value;
+                let combinedOutput = "";
+                let characterCycleCount = {};
+
+                for (let i = 0; i < rawText.length; i++) {
+                    let baseChar = rawText[i];
+
+                    if (!characterCycleCount[baseChar]) {
+                        characterCycleCount[baseChar] = 0;
+                    }
+
+                    const availableVariants = [];
+                    variantSuffixes.forEach(suffix => {
+                        const key = baseChar + suffix;
+                        if (allGlyphs[key] && allGlyphs[key].strokes && allGlyphs[key].strokes.length > 0) {
+                            availableVariants.push(key);
+                        }
+                    });
+
+                    if (availableVariants.length > 0) {
+                        let cycleIndex = characterCycleCount[baseChar] % availableVariants.length;
+                        let chosenVariantKey = availableVariants[cycleIndex];
+                        if (globalVariantUnicodeMap[chosenVariantKey]) {
+                            combinedOutput += String.fromCharCode(globalVariantUnicodeMap[chosenVariantKey]);
+                        } else {
+                            combinedOutput += baseChar;
+                        }
+                    } else {
+                        combinedOutput += baseChar;
+                    }
+
+                    characterCycleCount[baseChar]++;
+                }
+
+                // Wait for the font to be parsed before swapping in text
+                document.fonts.load(`${currentPreviewSize}px MyLiveHandwriting`).then(() => {
+                    renderElement.innerText = combinedOutput;
+                }).catch(() => {
+                    renderElement.innerText = combinedOutput;
+                });
+
+            } catch (err) {
+                console.error("Live preview compiler loop error:", err);
+                renderElement.innerText = inputElement.value;
+            }
+        }
+
+        function exportFont() {
+            if (Object.keys(allGlyphs).length === 0) {
+                showToast('Please draw at least one letter variant first!', 'warn');
+                return;
+            }
+            openExportModal('otf');
+        }
+
+        // ── Stroke Weight Slider ──
+        function onStrokeWeightChange(value) {
+            currentStrokeWeight = parseInt(value);
+            document.getElementById('strokeWeightLabel').innerText = currentStrokeWeight;
+            updatePreviewText();
+        }
+
+        // ── Letter Spacing Slider ──
+        let currentLetterSpacing = 0;
+        function onLetterSpacingChange(value) {
+            currentLetterSpacing = parseFloat(value);
+            const label = currentLetterSpacing === 0 ? '0em' : currentLetterSpacing.toFixed(2) + 'em';
+            document.getElementById('letterSpacingLabel').innerText = label;
+            const renderEl = document.getElementById('fontPreviewRender');
+            renderEl.style.letterSpacing = currentLetterSpacing + 'em';
+        }
+
+        // ── Preview Font Size Slider ──
+        let currentPreviewSize = 30;
+        function onPreviewSizeChange(value) {
+            currentPreviewSize = parseInt(value);
+            document.getElementById('previewSizeLabel').innerText = currentPreviewSize + 'px';
+            document.getElementById('fontPreviewRender').style.fontSize = currentPreviewSize + 'px';
+        }
+
+        // ── Settings Popup Toggle ──
+        function toggleSettingsPopup(e) {
+            e.stopPropagation();
+            const popup = document.getElementById('settingsPopup');
+            const isHidden = popup.classList.contains('hidden');
+            popup.classList.toggle('hidden', !isHidden);
+            if (!isHidden) return;
+            lucide.createIcons();
+        }
+        document.addEventListener('click', () => {
+            document.getElementById('settingsPopup').classList.add('hidden');
+        });
+
+        // ── Toast System ──
+        function showToast(msg, type = 'info', durationMs = 3500) {
+            const icons = { info: 'ℹ️', success: '✅', warn: '⚠️', error: '❌' };
+            const container = document.getElementById('toastContainer');
+            const el = document.createElement('div');
+            el.className = `toast ${type}`;
+            el.innerHTML = `<span style="font-size:15px">${icons[type] || ''}</span><span>${msg}</span>`;
+            container.appendChild(el);
+            const dismiss = () => {
+                el.classList.add('leaving');
+                el.addEventListener('animationend', () => el.remove(), { once: true });
+            };
+            const timer = setTimeout(dismiss, durationMs);
+            el.addEventListener('click', () => { clearTimeout(timer); dismiss(); });
+        }
+
+        // ── Confirm Modal ──
+        let _confirmResolve = null;
+        function showConfirm(title, msg, okLabel = 'Confirm', danger = true) {
+            return new Promise(resolve => {
+                _confirmResolve = resolve;
+                document.getElementById('confirmModalTitle').innerText = title;
+                document.getElementById('confirmModalMsg').innerText = msg;
+                const okBtn = document.getElementById('confirmModalOkBtn');
+                okBtn.innerText = okLabel;
+                okBtn.className = `flex-1 py-2.5 rounded-xl text-sm font-bold transition ${danger ? 'bg-red-500 hover:bg-red-600 text-white' : 'bg-orange-500 hover:bg-orange-600 text-black'}`;
+                document.getElementById('confirmModal').style.display = 'flex';
+                lucide.createIcons();
+            });
+        }
+        function resolveConfirm(result) {
+            _closeModal('confirmModal');
+            if (_confirmResolve) { _confirmResolve(result); _confirmResolve = null; }
+        }
+
+        // ── Export Naming Modal ──
+        function openExportModal(type) {
+            _pendingExportType = type;
+            const isOtf = type === 'otf';
+            document.getElementById('exportModalTitle').innerText = isOtf ? 'Export .OTF Font' : 'Export Project JSON';
+            document.getElementById('exportModalSub').innerText = isOtf ? 'Configure your font metadata and filename' : 'Choose a filename for your project backup';
+            document.getElementById('exportFileExt').innerText = isOtf ? '.otf' : '.json';
+            document.getElementById('exportFilenameInput').value = isOtf ? 'my-handwriting' : 'font_studio_backup';
+            document.getElementById('otfOptions').style.display = isOtf ? 'block' : 'none';
+            if (isOtf) {
+                document.getElementById('exportFamilyName').value = document.getElementById('exportFamilyName').value || 'My Handwriting';
+                document.getElementById('exportStyleName').value = document.getElementById('exportStyleName').value || 'Regular';
+            }
+            document.getElementById('exportModal').style.display = 'flex';
+            setTimeout(() => document.getElementById('exportFilenameInput').focus(), 80);
+            lucide.createIcons();
+        }
+        function closeExportModal() { _closeModal('exportModal'); }
+        function confirmExport() {
+            const filename = document.getElementById('exportFilenameInput').value.trim() || (_pendingExportType === 'otf' ? 'my-handwriting' : 'font_studio_backup');
+            closeExportModal();
+            if (_pendingExportType === 'json') {
+                _doExportJSON(filename);
+                showToast('Project saved as “' + filename + '.json”', 'success');
+            } else if (_pendingExportType === 'otf') {
+                const familyName = document.getElementById('exportFamilyName').value.trim() || 'My Handwriting';
+                const styleName = document.getElementById('exportStyleName').value.trim() || 'Regular';
+                const designer = document.getElementById('exportDesigner').value.trim() || '';
+                try {
+                    const font = compileFontEngine({ strokeWeight: currentStrokeWeight, letterSpacing: currentLetterSpacing, familyName, styleName, designer });
+                    font.download(filename + '.otf');
+                    showToast('Font exported as “' + filename + '.otf”', 'success');
+                } catch (e) {
+                    console.error(e);
+                    showToast('Export failed — check console for details.', 'error');
+                }
+            }
+        }
+
+        // ── Generic modal close ──
+        function _closeModal(id) {
+            const el = document.getElementById(id);
+            el.classList.add('closing');
+            el.addEventListener('animationend', () => { el.style.display = 'none'; el.classList.remove('closing'); }, { once: true });
+        }
+        // Close modals on backdrop click
+        document.getElementById('exportModal').addEventListener('click', closeExportModal);
+        document.getElementById('confirmModal').addEventListener('click', () => resolveConfirm(false));
+
+        const savedData = localStorage.getItem('myHandwritingGlyphs');
+        if (savedData) {
+            try {
+                let parsed = JSON.parse(savedData);
+                for (let key in parsed) {
+                    if (Array.isArray(parsed[key])) {
+                        parsed[key] = {
+                            canvasSize: 500,
+                            strokes: parsed[key]
+                        };
+                    }
+                }
+                allGlyphs = parsed;
+            } catch (e) {
+                allGlyphs = {};
+            }
+        }
+
+        buildGrids();
+        updateMenuBadges();
+        // Initialize Lucide vector graphics layer icons
+        lucide.createIcons();
+    </script>
+</body>
+
+</html>
