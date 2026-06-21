@@ -1,0 +1,31 @@
+{
+  "name": "List of taiyuuu.github.io features",
+  "count": 8,
+  "language": "en-US",
+  "programming_language": "HTML",
+  "base URL": "https://taiyuuu.github.io",
+  "list": {
+    "docs": {
+      "home": "/docs",
+      "mathOS": "/docs/mathOS",
+      "Eco-Budgeter": "/docs/Eco-Budgeter",
+      "Font Studio": "/docs/FontCreate"
+    },
+    "product categories": {
+      "service": {
+        "Eco-budgeter": "https://eco-budgeter-app.vercel.app"
+      },
+      "tool": {
+        "Font Studio": "/FontCreate",
+        "Floor Planner": "/FllorPlanner",
+        "File Converter": "/Convert",
+        "Better Calculator/Math Environment": "/mathOS"
+      },
+      "game": {
+        "Connect 4": "/Connect-4",
+        "Minesweeper": "/MineSweeper",
+        "Rhythm Game": "/Rhythm"
+      }
+    }
+  }
+}
