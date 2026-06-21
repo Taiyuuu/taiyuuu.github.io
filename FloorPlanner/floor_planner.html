@@ -1,0 +1,2237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Floor Planner</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/PointerLockControls.js"></script>
+    <style>
+        :root {
+            --bg-color: #f8f9fa;
+            --toolbar-color: #86c2ff;
+            --accent-color: #ff8000;
+            --grid-size: 25px;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            overflow: hidden;
+        }
+
+        #toolbar {
+            background-color: var(--toolbar-color);
+            color: white;
+            padding: 10px 20px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            z-index: 10;
+        }
+
+        .tool-btn {
+            background: #ffffff;
+            border: 1px solid #007bff;
+            color: #000000;
+            padding: 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 48px;
+            height: 42px;
+        }
+
+        .tool-btn:hover { background: #ffba89; }
+        .tool-btn.active {
+            background: var(--accent-color);
+            border-color: var(--accent-color);
+            font-weight: bold;
+            color: #ffffff;
+        }
+
+        .tool-btn img {
+            width: 28px;
+            height: 28px;
+            pointer-events: none;
+        }
+
+        #colorPicker {
+            width: 48px;
+            height: 42px;
+            border: none;
+            padding: 0;
+            cursor: pointer;
+            background: none;
+        }
+
+        #status-bar {
+            margin-left: auto;
+            font-size: 18px;
+            color: #000000;
+        }
+
+        #canvas-container {
+            flex: 1;
+            position: relative;
+            overflow: auto;
+            cursor: crosshair;
+        }
+
+        canvas {
+            display: block;
+            transform-origin: 0 0;
+            background-image: 
+                linear-gradient(to right, #e0e0e0 1px, transparent 1px),
+                linear-gradient(to bottom, #e0e0e0 1px, transparent 1px);
+            background-size: var(--grid-size) var(--grid-size);
+            background-color: white;
+        }
+
+        #settings-menu {
+            display: none;
+            position: absolute;
+            top: 60px;
+            left: 20px;
+            background: var(--toolbar-color);
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            z-index: 20;
+            color: white;
+            flex-direction: column;
+            gap: 12px;
+            min-width: 220px;
+        }
+        #settings-menu label { font-size: 13px; color: #000000; }
+        #settings-menu input { width: 100%; margin-top: 5px; cursor: pointer; }
+
+        #download-menu {
+            display: none;
+            position: absolute;
+            top: 60px;
+            left: 360px;
+            background: var(--toolbar-color);
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            z-index: 20;
+            color: white;
+            flex-direction: column;
+            gap: 10px;
+            min-width: 160px;
+        }
+
+        #brush-preview {
+            position: fixed;
+            border-radius: 50%;
+            pointer-events: none;
+            transform: translate(-50%, -50%);
+            z-index: 1000;
+            display: none;
+            border: 1px solid var(--accent-color);
+            background: rgba(255, 255, 255, 0.3);
+            box-shadow: 0 0 3px rgba(0,0,0,0.3); /* Ensures visibility on white canvas */
+        }
+
+        /* Info Modal Styles */
+        #info-modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 3000;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(3px);
+        }
+        #info-content {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            max-width: 700px;
+            width: 90%;
+            max-height: 85vh;
+            overflow-y: auto;
+            position: relative;
+            color: #333;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        #close-info {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            font-size: 28px;
+            cursor: pointer;
+            color: #999;
+            transition: color 0.2s;
+        }
+        #close-info:hover { color: #e74c3c; }
+        .info-section h3 { border-bottom: 2px solid var(--toolbar-color); padding-bottom: 5px; margin-top: 20px; color: #2c3e50; }
+        .info-section:first-of-type h3 { margin-top: 0; }
+        .shortcut-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        .shortcut-table td { padding: 8px 0; border-bottom: 1px solid #eee; font-size: 14px; }
+        .key-badge { 
+            background: #f0f0f0; padding: 2px 8px; border-radius: 4px; font-family: monospace; 
+            font-weight: bold; border: 1px solid #ccc; color: #333;
+        }
+
+        #three-container {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 2000;
+            background: #000;
+        }
+        #three-canvas-container {
+            width: 100%;
+            height: 100%;
+        }
+        #exit-3d {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            background: #e74c3c;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            z-index: 2001;
+            font-weight: bold;
+        }
+        #three-instructions {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            background: rgba(0,0,0,0.7);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            pointer-events: none;
+            z-index: 2001;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="toolbar">
+        <button id="drawBtn" class="tool-btn active" onclick="setTool('draw')" title="Draw"><img src="icons/draw.svg" alt="Draw"></button>
+        <button id="eraseBtn" class="tool-btn" onclick="setTool('erase')" title="Erase"><img src="icons/erase.svg" alt="Erase"></button>
+        <button id="selectBtn" class="tool-btn" onclick="setTool('select')" title="Select"><img src="icons/select.svg" alt="Select"></button>
+        <button id="shapesBtn" class="tool-btn" onclick="setTool('shapes')" title="Shapes"><img src="icons/shapes.svg" alt="Shapes"></button>
+        <button id="fillBtn" class="tool-btn" onclick="setTool('fill')" title="Fill"><img src="icons/fill.svg" alt="Fill"></button>
+        <button id="textBtn" class="tool-btn" onclick="setTool('text')" title="Text"><img src="icons/text.svg" alt="Text"></button>
+        <div id="shapeSelector" style="display: none; gap: 5px; align-items: center; margin-left: 5px;">
+            <label style="font-size: 12px; color: #000000;">Type:</label>
+            <select id="shapeType" style="background: #ffffff; color: rgb(0, 0, 0); border: 1px solid #5d6d7e; border-radius: 4px; padding: 4px; cursor: pointer;">
+                <option value="rect">Rectangle</option>
+                <option value="oval">Oval</option>
+                <option value="door">Door</option>
+            </select>
+        </div>
+        <div style="font-size: 30px; color: #000000;">|</div>
+        <button id="clearBtn" class="tool-btn" onclick="clearCanvas()" title="Clear Canvas"><img src="icons/clear.svg" alt="Clear"></button>
+        <button id="saveFileBtn" class="tool-btn" onclick="saveToFile()" title="Save Project"><img src="icons/save.svg" alt="Save"></button>
+        <button id="loadFileBtn" class="tool-btn" onclick="document.getElementById('fileLoader').click()" title="Load Project"><img src="icons/load.svg" alt="Load"></button>
+        <input type="file" id="fileLoader" style="display:none" accept=".json" onchange="loadFromFile(this.files[0])">
+        <button id="undoBtn" class="tool-btn" onclick="undo()" title="Undo"><img src="icons/undo.svg" alt="Undo"></button>
+        <button id="redoBtn" class="tool-btn" onclick="redo()" title="Redo"><img src="icons/redo.svg" alt="Redo"></button>
+        <button id="settingsBtn" class="tool-btn" onclick="toggleSettings()" title="Settings"><img src="icons/settings.svg" alt="Settings"></button>
+        <button id="downloadBtn" class="tool-btn" onclick="toggleDownloadMenu()" title="Download Image"><img src="icons/download.svg" alt="Download"></button>
+        <button id="view3dBtn" class="tool-btn" onclick="toggle3D()" title="View in 3D"><img src="icons/3d.svg" alt="3D"></button>
+        <button id="infoBtn" class="tool-btn" onclick="toggleInfo()" title="User Guide"><img src="icons/info.svg" alt="Info"></button>
+        <input type="color" id="colorPicker" value="#000000" onchange="updateColor(this.value)">
+        <div id="status-bar">
+            Mode: <span id="currentMode">Freehand</span> | 
+            Zoom: <span id="zoomVal">100</span>%
+        </div>
+    </div>
+
+    <div id="download-menu">
+        <button class="tool-btn" style="width: 100%" onclick="downloadCanvas('full')">Entire Grid</button>
+        <button class="tool-btn" style="width: 100%" onclick="downloadCanvas('crop')">Drawing Only</button>
+    </div>
+
+    <div id="three-container">
+        <div id="three-canvas-container"></div>
+        <canvas id="three-minimap" width="200" height="150" style="position: absolute; bottom: 20px; left: 20px; border: 2px solid white; border-radius: 4px; z-index: 2002; pointer-events: none; background: rgba(255,255,255,0.7);"></canvas>
+        <button id="exit-3d" onclick="toggle3D()">Exit 3D</button>
+        <div id="three-instructions">
+            <h2 style="margin-top: 0;">3D Preview</h2>
+            <p>Click anywhere to start looking around</p>
+            <p><b>W, A, S, D</b>: Move | <b>Space</b>: Jump | <b>Mouse</b>: Look</p>
+            <p><b>ESC</b>: Unlock cursor | Click <b>Exit</b> to return</p>
+        </div>
+    </div>
+
+    <div id="info-modal" onclick="toggleInfo(event)">
+        <div id="info-content" onclick="event.stopPropagation()">
+            <span id="close-info" onclick="toggleInfo()">&times;</span>
+            <h2 style="margin-top: 0; color: var(--accent-color);">Floor Planner Guide</h2>
+            
+            <div class="info-section">
+                <h3>🛠 Tools & Creation</h3>
+                <table class="shortcut-table">
+                    <tr><td><strong>Draw</strong></td><td>Switch modes with <span class="key-badge">W</span> (Wall), <span class="key-badge">C</span> (Curve), or <span class="key-badge">D</span> (Freehand).</td></tr>
+                    <tr><td><strong>Shapes</strong></td><td>Choose Rectangle, Oval, or Door from the dropdown. Snaps with <span class="key-badge">S</span>.</td></tr>
+                    <tr><td><strong>Fill</strong></td><td>Paint Bucket: Fills enclosed areas based on both drawings and walls.</td></tr>
+                    <tr><td><strong>Text</strong></td><td>Click to place a label. Click an existing label with the <strong>Select</strong> tool to edit.</td></tr>
+                    <tr><td><strong>Color</strong></td><td>The color picker sets the active color for all tools and text.</td></tr>
+                </table>
+            </div>
+
+            <div class="info-section">
+                <h3>🖱 Selection & Editing</h3>
+                <ul>
+                    <li><strong>Move:</strong> Use the <strong>Select</strong> tool to drag any wall, shape, curve, or text.</li>
+                    <li><strong>Edit Vertices:</strong> Select a wall or curve. Drag handles to reshape. <strong>Right-Click</strong> a segment to add a point; <strong>Right-Click</strong> a handle to delete it.</li>
+                    <li><strong>Windows:</strong> Select a wall, hover over a segment, and press <span class="key-badge">E</span>.</li>
+                    <li><strong>Marquee:</strong> In <strong>Select</strong> mode, drag on empty space to select freehand drawings. Use handles to <strong>Rotate</strong> (Hold <span class="key-badge">S</span> to snap) or <strong>Resize</strong> (Hold <span class="key-badge">Shift</span> to lock ratio).</li>
+                </ul>
+            </div>
+
+            <div class="info-section">
+                <h3>💾 Project & View</h3>
+                <ul>
+                    <li><strong>Undo/Redo:</strong> Reverse or restore actions using the toolbar buttons or <span class="key-badge">Ctrl</span> shortcuts.</li>
+                    <li><strong>Save/Load:</strong> Use <strong>Save</strong> to export a <code>.json</code> project file. Use <strong>Load</strong> to resume a previous project.</li>
+                    <li><strong>Clear:</strong> The canvas icon completely resets the canvas and project data.</li>
+                    <li><strong>3D View:</strong> Walk through your design. Use <strong>WASD</strong> to move and <strong>Mouse</strong> to look.</li>
+                    <li><strong>Download:</strong> Export your plan as a high-quality <code>.png</code> image.</li>
+                </ul>
+            </div>
+
+            <div class="info-section">
+                <h3>⚙️ Settings & Shortcuts</h3>
+                <table class="shortcut-table">
+                    <tr><td><strong>Settings</strong></td><td>Adjust line thickness, grid size, snap density, and font size.</td></tr>
+                    <tr><td><span class="key-badge">Shift</span></td><td>Draw straight lines or keep selection aspect ratio.</td></tr>
+                    <tr><td><span class="key-badge">S</span></td><td>Snap shapes to grid / Snap rotation to 10° increments.</td></tr>
+                    <tr><td><span class="key-badge">Space</span></td><td>Finish the current Wall or Curve point sequence.</td></tr>
+                    <tr><td><span class="key-badge">Arrows</span></td><td>Change selected Door orientation.</td></tr>
+                    <tr><td><span class="key-badge">Ctrl</span> + <span class="key-badge">Z</span> / <span class="key-badge">Y</span></td><td>Undo / Redo.</td></tr>
+                    <tr><td><span class="key-badge">Z</span> / <span class="key-badge">Alt</span> + <span class="key-badge">Z</span></td><td>Zoom In / Out.</td></tr>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="settings-menu">
+        <div>
+            <label>Freehand Thickness: <span id="freehandVal">2</span>px</label>
+            <input type="range" id="freehandSlider" min="1" max="20" value="2" oninput="updateSettings('freehand')">
+        </div>
+        <div>
+            <label>Wall Thickness: <span id="wallVal">6</span>px</label>
+            <input type="range" id="wallSlider" min="2" max="30" step="2" value="6" oninput="updateSettings('wall')">
+        </div>
+        <div>
+            <label>Eraser Size: <span id="eraserVal">15</span>px</label>
+            <input type="range" id="eraserSlider" min="5" max="100" value="15" oninput="updateSettings('eraser')">
+        </div>
+        <div style="border-top: 1px solid #5d6d7e; padding-top: 10px; margin-top: 5px;">
+            <label>Grid Columns: <span id="colsVal">80</span></label>
+            <input type="range" id="colsSlider" min="10" max="300" value="80" oninput="updateGridSize()">
+        </div>
+        <div>
+            <label>Grid Rows: <span id="rowsVal">60</span></label>
+            <input type="range" id="rowsSlider" min="10" max="300" value="60" oninput="updateGridSize()">
+        </div>
+        <div>
+            <label>Points per Grid Unit: <span id="snapPointsVal">2</span></label>
+            <input type="range" id="snapPointsSlider" min="2" max="11" step="1" value="2" oninput="updateSettings('snap')">
+        </div>
+        <div>
+            <label>Font Size: <span id="fontSizeVal">16</span>px</label>
+            <div id="font-preview" style="background: white; color: black; border: 1px solid #5d6d7e; height: 50px; display: flex; align-items: center; justify-content: center; margin: 5px 0; border-radius: 4px; overflow: hidden; font-family: Arial;">Aa</div>
+            <input type="range" id="fontSizeSlider" min="8" max="72" value="16" oninput="updateSettings('font')">
+        </div>
+        <div>
+            <label>3D Move Speed: <span id="speed3DVal">1200</span></label>
+            <input type="range" id="speed3DSlider" min="100" max="5000" step="100" value="1200" oninput="updateSettings('speed3D')">
+        </div>
+        <div style="border-top: 1px solid #5d6d7e; padding-top: 10px; margin-top: 5px;">
+            <label>Download Margin: <span id="marginVal">50</span>px</label>
+            <input type="range" id="marginSlider" min="0" max="200" value="50" oninput="updateSettings('margin')">
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <input type="checkbox" id="gridDownloadCheckbox" checked onchange="updateSettings('grid')" style="width: auto; margin-top: 0;">
+            <label for="gridDownloadCheckbox" style="margin: 0;">Include grid in export</label>
+        </div>
+    </div>
+
+    <div id="brush-preview"></div>
+    <input type="text" id="canvas-text-input" style="position: fixed; display: none; z-index: 1001; border: 1px solid #3498db; outline: none; background: white; padding: 2px; font-family: Arial;">
+
+    <div id="canvas-container">
+        <div id="canvas-sizer" style="transform-origin: 0 0;">
+            <canvas id="plannerCanvas"></canvas>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('plannerCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Off-screen canvas to store freehand drawings/erasures
+        const offscreenCanvas = document.createElement('canvas');
+        const offscreenCtx = offscreenCanvas.getContext('2d');
+        
+        const brushPreview = document.getElementById('brush-preview');
+        const grid = 25;
+        
+        let currentTool = 'draw';
+        let isWallMode = false;
+        let isCurveMode = false;
+        let isDrawing = false;
+        let currentColor = '#000000';
+        let zoomLevel = 1.0;
+        
+        let gridCols = 80;
+        let gridRows = 60;
+        
+        let lineStart = null;
+        let currentMousePos = { x: 0, y: 0 };
+        let shiftPressed = false;
+        let sKeyPressed = false;
+
+        let undoStack = [];
+        let redoStack = [];
+
+        let allWalls = []; // Array of {points: [], color, thickness}
+        let allShapes = []; // Array of {type, x, y, w, h, color, thickness, doorType}
+        let allCurves = []; // Array of {points: [], color, thickness}
+        let allLabels = []; // Array of {text, x, y, color, size}
+        let wallPoints = [];
+        let curvePoints = [];
+        let shapeStart = null;
+        let currentShapeDims = null;
+        let hoverPoint = null; // Track current snapped mouse position for preview
+        
+        let freehandThickness = 2;
+        let wallThickness = 6;
+        let eraserSize = 15;
+        let fontSize = 16;
+        let moveSpeed3D = 1200;
+        let pointsPerUnit = 2;
+        let downloadMargin = 50;
+        let includeGridInDownload = true;
+        let lastMouseX = 0;
+        let lastMouseY = 0;
+        let previewTimeout;
+
+        let selectedWallIdx = -1;
+        let draggedVertexIdx = -1;
+        let selectedCurveIdx = -1;
+        let draggedCurveVertexIdx = -1;
+        let selectedShapeIdx = -1;
+        let selectedLabelIdx = -1;
+        let editingLabelIdx = -1;
+        let isDraggingEntireObject = false;
+        let isMarqueeDrawing = false;
+        let marqueeRect = null;
+        let activeBitmapSelection = null; // { x, y, w, h, angle, canvas, originalW, originalH }
+        let activeHandle = null; // 'move', 'rotate', 'tl', 'tr', 'bl', 'br', 't', 'b', 'l', 'r'
+        let dragStartPos = { x: 0, y: 0 };
+        let pendingTextPos = null;
+
+        // 3D Engine Variables
+        let scene, camera, renderer, controls;
+        let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
+        let prevTime = performance.now();
+        let velocity = new THREE.Vector3();
+        let direction = new THREE.Vector3();
+        let is3DActive = false;
+        let canJump = false;
+        let wallsGroup;
+        let doorsGroup;
+        let allDoorMeshes = [];
+
+        window.addEventListener('mousemove', (e) => {
+            lastMouseX = e.clientX;
+            lastMouseY = e.clientY;
+        });
+
+        // Initialize Canvas Size
+        function initCanvas() {
+            canvas.width = gridCols * grid;
+            canvas.height = gridRows * grid;
+            offscreenCanvas.width = canvas.width;
+            offscreenCanvas.height = canvas.height;
+            
+            [ctx, offscreenCtx].forEach(c => {
+                c.lineCap = 'round';
+                c.lineJoin = 'round';
+            });
+            applyZoom();
+            render();
+        }
+
+        function saveToFile() {
+            const data = {
+                walls: allWalls,
+                shapes: allShapes,
+                curves: allCurves,
+                activeBitmapSelection: activeBitmapSelection ? { ...activeBitmapSelection, canvas: null } : null, // Don't save transient selection state
+                gridCols: gridCols,
+                gridRows: gridRows,
+                settings: {
+                    freehandThickness,
+                    wallThickness,
+                    eraserSize,
+                    downloadMargin,
+                    includeGridInDownload,
+                    pointsPerUnit,
+                    fontSize,
+                    moveSpeed3D
+                },
+                labels: allLabels,
+                bitmap: offscreenCanvas.toDataURL()
+            };
+            const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.download = `floor-plan-${Date.now()}.json`;
+            link.href = url;
+            link.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function loadFromFile(file) {
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    
+                    allWalls = (data.walls || []).map(w => ({
+                        ...w,
+                        windows: w.windows || new Array(w.points.length - 1).fill(false)
+                    }));
+                    allShapes = data.shapes || [];
+                    allCurves = data.curves || [];
+                    allLabels = data.labels || [];
+                    gridCols = data.gridCols || 80;
+                    gridRows = data.gridRows || 60;
+                    
+                    if (data.settings) {
+                        document.getElementById('freehandSlider').value = data.settings.freehandThickness || 2;
+                        document.getElementById('wallSlider').value = data.settings.wallThickness || 6;
+                        document.getElementById('eraserSlider').value = data.settings.eraserSize || 15;
+                        document.getElementById('marginSlider').value = data.settings.downloadMargin || 50;
+                        document.getElementById('snapPointsSlider').value = data.settings.pointsPerUnit || 2;
+                        document.getElementById('fontSizeSlider').value = data.settings.fontSize || 16;
+                        document.getElementById('speed3DSlider').value = data.settings.moveSpeed3D || 1200;
+                        document.getElementById('gridDownloadCheckbox').checked = data.settings.includeGridInDownload !== undefined ? data.settings.includeGridInDownload : true;
+                        updateSettings();
+                    }
+
+                    document.getElementById('colsSlider').value = gridCols;
+                    document.getElementById('colsVal').innerText = gridCols;
+                    document.getElementById('rowsSlider').value = gridRows;
+                    document.getElementById('rowsVal').innerText = gridRows;
+
+                    initCanvas();
+
+                    if (data.bitmap) {
+                        const img = new Image();
+                        img.onload = () => {
+                            offscreenCtx.clearRect(0, 0, offscreenCanvas.width, offscreenCanvas.height);
+                            offscreenCtx.drawImage(img, 0, 0);
+                            saveState(); // Commit to undo history
+                            render();
+                        };
+                        img.src = data.bitmap;
+                    } else {
+                        saveState();
+                        render();
+                    }
+                } catch (err) {
+                    alert("Error loading floor plan: " + err.message);
+                }
+            };
+            reader.readAsText(file);
+            document.getElementById('fileLoader').value = '';
+        }
+
+        function saveState() {
+            const state = {
+                walls: JSON.parse(JSON.stringify(allWalls)),
+                shapes: JSON.parse(JSON.stringify(allShapes)),
+                curves: JSON.parse(JSON.stringify(allCurves)),
+                labels: JSON.parse(JSON.stringify(allLabels)),
+                bitmap: offscreenCtx.getImageData(0, 0, offscreenCanvas.width, offscreenCanvas.height),
+                cols: gridCols,
+                rows: gridRows
+            };
+            undoStack.push(state);
+            if (undoStack.length > 40) undoStack.shift();
+            redoStack = [];
+        }
+
+        function applyState(state) {
+            allWalls = JSON.parse(JSON.stringify(state.walls));
+            allShapes = JSON.parse(JSON.stringify(state.shapes));
+            allCurves = JSON.parse(JSON.stringify(state.curves || []));
+            allLabels = JSON.parse(JSON.stringify(state.labels || []));
+            gridCols = state.cols;
+            gridRows = state.rows;
+            
+            document.getElementById('colsSlider').value = gridCols;
+            document.getElementById('colsVal').innerText = gridCols;
+            document.getElementById('rowsSlider').value = gridRows;
+            document.getElementById('rowsVal').innerText = gridRows;
+
+            canvas.width = gridCols * grid;
+            canvas.height = gridRows * grid;
+            offscreenCanvas.width = canvas.width;
+            offscreenCanvas.height = canvas.height;
+            
+            [ctx, offscreenCtx].forEach(c => {
+                c.lineCap = 'round';
+                c.lineJoin = 'round';
+            });
+            
+            offscreenCtx.putImageData(state.bitmap, 0, 0);
+            selectedWallIdx = -1;
+            selectedCurveIdx = -1;
+            selectedShapeIdx = -1;
+            selectedLabelIdx = -1;
+            editingLabelIdx = -1;
+            isDraggingEntireObject = false;
+            activeBitmapSelection = null;
+            applyZoom();
+            render();
+        }
+
+        function undo() { if (undoStack.length > 1) { redoStack.push(undoStack.pop()); applyState(undoStack[undoStack.length - 1]); } }
+        function redo() { if (redoStack.length > 0) { const state = redoStack.pop(); undoStack.push(state); applyState(state); } }
+
+        function finishCurrentWall() {
+            if (wallPoints.length > 1) {
+                allWalls.push({
+                    points: [...wallPoints],
+                    color: currentColor,
+                    thickness: wallThickness,
+                    windows: new Array(wallPoints.length - 1).fill(false)
+                });
+                saveState();
+            }
+            wallPoints = [];
+        }
+
+        function setTool(tool) {
+            if (currentTool === 'draw' && isWallMode) finishCurrentWall();
+            if (currentTool === 'draw' && isCurveMode) finishCurrentCurve();
+            if (activeBitmapSelection) commitBitmapSelection();
+            
+            currentTool = tool;
+            isWallMode = false; // Reset wall mode when switching tools
+            isCurveMode = false;
+            wallPoints = [];
+            curvePoints = [];
+            selectedWallIdx = -1;
+            selectedCurveIdx = -1;
+            draggedVertexIdx = -1;
+            selectedShapeIdx = -1;
+            selectedLabelIdx = -1;
+            editingLabelIdx = -1;
+            isDraggingEntireObject = false;
+            activeBitmapSelection = null;
+            shapeStart = null;
+            currentShapeDims = null;
+            
+            document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(tool + 'Btn').classList.add('active');
+            
+            const shapeSelector = document.getElementById('shapeSelector');
+            if (shapeSelector) shapeSelector.style.display = (tool === 'shapes') ? 'flex' : 'none';
+
+            updateStatus();
+            render();
+        }
+
+        function updateColor(val) { currentColor = val; }
+
+        function updateStatus() {
+            const modeText = isCurveMode ? "Curve" : 
+                           isWallMode ? "Wall (Snapping)" : 
+                           (currentTool === 'erase' ? "Eraser" : 
+                           (currentTool === 'select' ? "Selection" : 
+                           (currentTool === 'shapes' ? "Shapes" : 
+                           (currentTool === 'fill' ? "Paint Bucket" : 
+                           (currentTool === 'text' ? "Text Tool" : "Freehand")))));
+            document.getElementById('currentMode').innerText = modeText;
+            document.getElementById('zoomVal').innerText = Math.round(zoomLevel * 100);
+        }
+
+        function applyZoom() {
+            canvas.style.transform = `scale(${zoomLevel})`;
+            const sizer = document.getElementById('canvas-sizer');
+            // Update sizer dimensions to maintain correct scrollable area
+            sizer.style.width = (canvas.width * zoomLevel) + 'px';
+            sizer.style.height = (canvas.height * zoomLevel) + 'px';
+        }
+
+        const snap = (val) => {
+            const step = grid / (pointsPerUnit - 1);
+            return Math.round(val / step) * step;
+        };
+
+        canvas.addEventListener('mousedown', (e) => {
+            const isRightClick = e.button === 2;
+            const rect = canvas.getBoundingClientRect();
+            
+            // Translate screen mouse position to internal canvas coordinates based on zoom
+            const x = (e.clientX - rect.left) / zoomLevel;
+            const y = (e.clientY - rect.top) / zoomLevel;
+
+            if (isRightClick && currentTool === 'select' && selectedWallIdx !== -1) {
+                handleRightClickEdit(x, y);
+                return;
+            }
+
+            if (isRightClick && currentTool === 'select' && selectedCurveIdx !== -1) {
+                handleRightClickCurveEdit(x, y);
+                return;
+            }
+
+            if (currentTool === 'draw') {
+                if (isWallMode) {
+                    const snappedX = snap(x);
+                    const snappedY = snap(y);
+                    wallPoints.push({x: snappedX, y: snappedY});
+                    render();
+                } else if (isCurveMode) {
+                    curvePoints.push({x, y});
+                    render();
+                } else {
+                    isDrawing = true;
+                    lineStart = { x, y };
+                    offscreenCtx.globalCompositeOperation = 'source-over';
+                    offscreenCtx.strokeStyle = currentColor;
+                    offscreenCtx.lineWidth = freehandThickness;
+                    offscreenCtx.beginPath();
+                    offscreenCtx.moveTo(x, y);
+                }
+            } else if (currentTool === 'erase') {
+                isDrawing = true;
+                offscreenCtx.globalCompositeOperation = 'destination-out';
+            } else if (currentTool === 'select' && !isRightClick) {
+                const handle = getSelectionHandle(x, y);
+                if (handle) {
+                    activeHandle = handle;
+                    dragStartPos = { x, y };
+                } else {
+                    if (activeBitmapSelection) commitBitmapSelection();
+                    handleSelection(x, y);
+                    if (selectedWallIdx === -1 && selectedShapeIdx === -1 && selectedLabelIdx === -1 && selectedCurveIdx === -1) {
+                        isMarqueeDrawing = true;
+                        marqueeRect = { x1: x, y1: y, x2: x, y2: y };
+                    } else if (draggedVertexIdx === -1 && editingLabelIdx === -1) {
+                        isDraggingEntireObject = true;
+                        dragStartPos = { x, y };
+                    }
+                }
+            } else if (currentTool === 'shapes') {
+                isDrawing = true;
+                selectedShapeIdx = -1;
+                shapeStart = { x: sKeyPressed ? snap(x) : x, y: sKeyPressed ? snap(y) : y };
+            } else if (currentTool === 'text') {
+                const textInput = document.getElementById('canvas-text-input');
+                pendingTextPos = { x, y };
+                editingLabelIdx = -1;
+                textInput.style.left = (e.clientX) + 'px';
+                textInput.style.top = (e.clientY) + 'px';
+                textInput.style.fontSize = (fontSize * zoomLevel) + 'px';
+                textInput.style.color = currentColor;
+                textInput.style.display = 'block';
+                textInput.value = '';
+                setTimeout(() => textInput.focus(), 0);
+            } else if (currentTool === 'fill') {
+                floodFill(x, y, hexToRgb(currentColor));
+                saveState();
+                render();
+            }
+        });
+
+        function getSelectionHandle(x, y) {
+            if (!activeBitmapSelection) return null;
+            const s = activeBitmapSelection;
+            const cx = s.x + s.w / 2;
+            const cy = s.y + s.h / 2;
+            
+            // Transform mouse point into local space of rotated selection
+            const dx = x - cx;
+            const dy = y - cy;
+            const localX = dx * Math.cos(-s.angle) - dy * Math.sin(-s.angle);
+            const localY = dx * Math.sin(-s.angle) + dy * Math.cos(-s.angle);
+            
+            const hSize = 8 / zoomLevel;
+            const hw = s.w / 2;
+            const hh = s.h / 2;
+
+            // Rotation handle (beside/above the box)
+            const rotY = -hh - 30 / zoomLevel;
+            if (Math.hypot(localX, localY - rotY) < hSize * 1.5) return 'rotate';
+
+            // Corner/Edge handles
+            if (Math.abs(localX + hw) < hSize && Math.abs(localY + hh) < hSize) return 'tl';
+            if (Math.abs(localX - hw) < hSize && Math.abs(localY + hh) < hSize) return 'tr';
+            if (Math.abs(localX + hw) < hSize && Math.abs(localY - hh) < hSize) return 'bl';
+            if (Math.abs(localX - hw) < hSize && Math.abs(localY - hh) < hSize) return 'br';
+            if (Math.abs(localY + hh) < hSize && Math.abs(localX) < hw) return 't';
+            if (Math.abs(localY - hh) < hSize && Math.abs(localX) < hw) return 'b';
+            if (Math.abs(localX + hw) < hSize && Math.abs(localY) < hh) return 'l';
+            if (Math.abs(localX - hw) < hSize && Math.abs(localY) < hh) return 'r';
+
+            if (Math.abs(localX) < hw && Math.abs(localY) < hh) return 'move';
+            return null;
+        }
+
+        function commitBitmapSelection() {
+            if (!activeBitmapSelection) return;
+            const s = activeBitmapSelection;
+            offscreenCtx.save();
+            offscreenCtx.translate(s.x + s.w/2, s.y + s.h/2);
+            offscreenCtx.rotate(s.angle);
+            offscreenCtx.drawImage(s.canvas, -s.w/2, -s.h/2, s.w, s.h);
+            offscreenCtx.restore();
+            activeBitmapSelection = null;
+            saveState();
+            render();
+        }
+
+        function startBitmapSelection(rect) {
+            const x = Math.min(rect.x1, rect.x2);
+            const y = Math.min(rect.y1, rect.y2);
+            const w = Math.abs(rect.x1 - rect.x2);
+            const h = Math.abs(rect.y1 - rect.y2);
+            if (w < 2 || h < 2) return;
+
+            const selCanvas = document.createElement('canvas');
+            selCanvas.width = w; selCanvas.height = h;
+            const sCtx = selCanvas.getContext('2d');
+            
+            // Copy the pixels from offscreen bitmap
+            sCtx.drawImage(offscreenCanvas, x, y, w, h, 0, 0, w, h);
+            
+            // Clear them from the background
+            offscreenCtx.clearRect(x, y, w, h);
+            
+            activeBitmapSelection = { 
+                x, y, w, h, 
+                angle: 0, 
+                canvas: selCanvas,
+                originalW: w,
+                originalH: h
+            };
+            render();
+        }
+
+        function handleSelection(x, y) {
+            // 1. Check if clicking a handle of the already selected wall
+            if (selectedWallIdx !== -1) {
+                const wall = allWalls[selectedWallIdx];
+                for (let i = 0; i < wall.points.length; i++) {
+                    const p = wall.points[i];
+                    if (Math.hypot(x - p.x, y - p.y) < 10) {
+                        draggedVertexIdx = i;
+                        return;
+                    }
+                }
+            }
+
+            // 1.2 Check if clicking a handle of the already selected curve
+            if (selectedCurveIdx !== -1) {
+                const curve = allCurves[selectedCurveIdx];
+                for (let i = 0; i < curve.points.length; i++) {
+                    const p = curve.points[i];
+                    if (Math.hypot(x - p.x, y - p.y) < 10) {
+                        draggedCurveVertexIdx = i;
+                        return;
+                    }
+                }
+            }
+
+            // 1.5 Check labels
+            for (let i = allLabels.length - 1; i >= 0; i--) {
+                const l = allLabels[i];
+                ctx.font = `${l.size}px Arial`;
+                const w = ctx.measureText(l.text).width;
+                if (x >= l.x && x <= l.x + w && y >= l.y - l.size && y <= l.y) {
+                    if (selectedLabelIdx === i) {
+                        // Enter edit mode for the already selected label
+                        const textInput = document.getElementById('canvas-text-input');
+                        pendingTextPos = { x: l.x, y: l.y };
+                        editingLabelIdx = i;
+                        const rect = canvas.getBoundingClientRect();
+                        textInput.style.left = (rect.left + l.x * zoomLevel) + 'px';
+                        textInput.style.top = (rect.top + l.y * zoomLevel - l.size * zoomLevel) + 'px';
+                        textInput.style.fontSize = (l.size * zoomLevel) + 'px';
+                        textInput.style.color = l.color;
+                        textInput.style.display = 'block';
+                        textInput.value = l.text;
+                        setTimeout(() => { textInput.focus(); textInput.select(); }, 0);
+                    } else {
+                        selectedLabelIdx = i;
+                        selectedWallIdx = -1;
+                        selectedCurveIdx = -1;
+                        selectedShapeIdx = -1;
+                    }
+                    render();
+                    return;
+                }
+            }
+
+            // 2. Check if clicking on a shape
+            for (let i = allShapes.length - 1; i >= 0; i--) {
+                const s = allShapes[i];
+                const dist = Math.hypot(x - s.x, y - s.y);
+                // Select if clicking near the origin/hinge or within the bounding box
+                if (dist < 20 || (x >= s.x && x <= s.x + s.w && y >= s.y && y <= s.y + s.h)) {
+                    selectedShapeIdx = i;
+                    selectedWallIdx = -1;
+                    selectedCurveIdx = -1;
+                    selectedLabelIdx = -1;
+                    render();
+                    return;
+                }
+            }
+
+            // 2. Check if clicking on any wall segment
+            let foundIdx = -1;
+            for (let i = 0; i < allWalls.length; i++) {
+                const wall = allWalls[i];
+                for (let j = 0; j < wall.points.length - 1; j++) {
+                    if (distToSegment({x, y}, wall.points[j], wall.points[j+1]) < 10) {
+                        foundIdx = i;
+                        break;
+                    }
+                }
+                if (foundIdx !== -1) break;
+            }
+            selectedWallIdx = foundIdx;
+            
+            // 3. Check if clicking on any curve segment
+            let foundCurveIdx = -1;
+            if (selectedWallIdx === -1) {
+                for (let i = 0; i < allCurves.length; i++) {
+                    const curve = allCurves[i];
+                    for (let j = 0; j < curve.points.length - 1; j++) {
+                        if (distToSegment({x, y}, curve.points[j], curve.points[j+1]) < 10) {
+                            foundCurveIdx = i;
+                            break;
+                        }
+                    }
+                    if (foundCurveIdx !== -1) break;
+                }
+            }
+            selectedCurveIdx = foundCurveIdx;
+            selectedShapeIdx = -1;
+            selectedLabelIdx = -1;
+            render();
+        }
+
+        // Math helper for segment hit detection
+        function distToSegment(p, v, w) {
+            const l2 = (v.x - w.x)**2 + (v.y - w.y)**2;
+            if (l2 === 0) return Math.hypot(p.x - v.x, p.y - v.y);
+            let t = ((p.x - v.x) * (w.x - v.x) + (p.y - v.y) * (w.y - v.y)) / l2;
+            t = Math.max(0, Math.min(1, t));
+            return Math.hypot(p.x - (v.x + t * (w.x - v.x)), p.y - (v.y + t * (w.y - v.y)));
+        }
+
+        function handleRightClickEdit(x, y) {
+            const wall = allWalls[selectedWallIdx];
+            if (!wall.windows) wall.windows = new Array(wall.points.length - 1).fill(false);
+            
+            // 1. Try to delete a vertex if clicked near one
+            for (let i = 0; i < wall.points.length; i++) {
+                const p = wall.points[i];
+                if (Math.hypot(x - p.x, y - p.y) < 10) {
+                    const oldLen = wall.points.length;
+                    wall.points.splice(i, 1);
+                    
+                    // Update windows array
+                    if (i === 0) wall.windows.shift();
+                    else if (i === oldLen - 1) wall.windows.pop();
+                    else wall.windows.splice(i - 1, 2, false); // Merge segments and reset window status
+
+                    // Remove the wall entirely if it has fewer than 2 points left
+                    if (wall.points.length < 2) {
+                        allWalls.splice(selectedWallIdx, 1);
+                        selectedWallIdx = -1;
+                    }
+                    saveState();
+                    render();
+                    return;
+                }
+            }
+
+            // 2. Otherwise, split the nearest segment to add a new vertex
+            const snappedPt = { x: snap(x), y: snap(y) };
+            let minDist = Infinity;
+            let insertIdx = -1;
+
+            for (let i = 0; i < wall.points.length - 1; i++) {
+                const d = distToSegment(snappedPt, wall.points[i], wall.points[i+1]);
+                if (d < minDist) {
+                    minDist = d;
+                    insertIdx = i + 1;
+                }
+            }
+
+            if (insertIdx !== -1) {
+                const isWin = wall.windows[insertIdx - 1];
+                wall.points.splice(insertIdx, 0, snappedPt);
+                wall.windows.splice(insertIdx - 1, 1, isWin, isWin);
+                saveState();
+                render();
+            }
+        }
+
+        function handleRightClickCurveEdit(x, y) {
+            const curve = allCurves[selectedCurveIdx];
+            
+            // 1. Try to delete a vertex
+            for (let i = 0; i < curve.points.length; i++) {
+                const p = curve.points[i];
+                if (Math.hypot(x - p.x, y - p.y) < 10) {
+                    curve.points.splice(i, 1);
+                    if (curve.points.length < 2) {
+                        allCurves.splice(selectedCurveIdx, 1);
+                        selectedCurveIdx = -1;
+                    }
+                    saveState();
+                    render();
+                    return;
+                }
+            }
+
+            // 2. Add vertex
+            const snappedPt = { x, y };
+            let minDist = Infinity;
+            let insertIdx = -1;
+            for (let i = 0; i < curve.points.length - 1; i++) {
+                const d = distToSegment(snappedPt, curve.points[i], curve.points[i+1]);
+                if (d < minDist) {
+                    minDist = d;
+                    insertIdx = i + 1;
+                }
+            }
+            if (insertIdx !== -1) {
+                curve.points.splice(insertIdx, 0, snappedPt);
+                saveState();
+                render();
+            }
+        }
+
+        function render() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw bitmap layer (freehand/eraser)
+            ctx.drawImage(offscreenCanvas, 0, 0);
+
+            // Draw established walls
+            allWalls.forEach((wall, idx) => {
+                drawWallPath(ctx, wall.points, wall.color, wall.thickness, wall.windows);
+                
+                // Draw editing handles if selected
+                if (idx === selectedWallIdx) {
+                    wall.points.forEach(p => {
+                        ctx.beginPath();
+                        ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fill();
+                        ctx.strokeStyle = '#3498db';
+                        ctx.lineWidth = 2;
+                        ctx.stroke();
+                    });
+                }
+            });
+
+            // Draw established shapes
+            allShapes.forEach((shape, idx) => {
+                ctx.save();
+                if (idx === selectedShapeIdx) {
+                    ctx.shadowBlur = 10;
+                    ctx.shadowColor = '#3498db';
+                    ctx.strokeStyle = '#3498db';
+                }
+                drawShape(ctx, shape);
+                ctx.restore();
+            });
+
+            // Draw established curves
+            allCurves.forEach((curve, idx) => {
+                drawCurvePath(ctx, curve.points, curve.color, curve.thickness);
+
+                // Draw editing handles if selected
+                if (idx === selectedCurveIdx) {
+                    curve.points.forEach(p => {
+                        ctx.beginPath();
+                        ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fill();
+                        ctx.strokeStyle = '#e67e22'; // Use a distinct color for curve handles
+                        ctx.lineWidth = 2;
+                        ctx.stroke();
+                    });
+                }
+            });
+
+            // Draw labels
+            allLabels.forEach((label, idx) => {
+                if (idx === editingLabelIdx) return; // Hide label while editing
+                ctx.save();
+                ctx.fillStyle = label.color;
+                ctx.font = `${label.size}px Arial`;
+                if (idx === selectedLabelIdx) {
+                    ctx.shadowBlur = 10;
+                    ctx.shadowColor = '#3498db';
+                }
+                ctx.fillText(label.text, label.x, label.y);
+                ctx.restore();
+            });
+            
+            // Draw Active Bitmap Selection
+            if (activeBitmapSelection) {
+                const s = activeBitmapSelection;
+                ctx.save();
+                ctx.translate(s.x + s.w/2, s.y + s.h/2);
+                ctx.rotate(s.angle);
+                
+                // Draw content
+                ctx.drawImage(s.canvas, -s.w/2, -s.h/2, s.w, s.h);
+                
+                // Draw Dotted Box
+                ctx.setLineDash([5, 5]);
+                ctx.strokeStyle = '#3498db';
+                ctx.lineWidth = 1 / zoomLevel;
+                ctx.strokeRect(-s.w/2, -s.h/2, s.w, s.h);
+                
+                // Draw Handles
+                ctx.setLineDash([]);
+                ctx.fillStyle = '#ffffff';
+                const hSize = 8 / zoomLevel;
+                const handles = [
+                    [-s.w/2, -s.h/2], [s.w/2, -s.h/2], [-s.w/2, s.h/2], [s.w/2, s.h/2], // corners
+                    [0, -s.h/2], [0, s.h/2], [-s.w/2, 0], [s.w/2, 0] // edges
+                ];
+                handles.forEach(([hx, hy]) => {
+                    ctx.fillRect(hx - hSize/2, hy - hSize/2, hSize, hSize);
+                    ctx.strokeRect(hx - hSize/2, hy - hSize/2, hSize, hSize);
+                });
+
+                // Rotation Icon (beside/above)
+                ctx.beginPath();
+                ctx.arc(0, -s.h/2 - 30/zoomLevel, hSize, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+                // Draw tiny arrow in circle
+                ctx.beginPath();
+                ctx.arc(0, -s.h/2 - 30/zoomLevel, hSize*0.6, 0, Math.PI * 1.5);
+                ctx.stroke();
+
+                // Show angle while rotating
+                if (activeHandle === 'rotate') {
+                    ctx.fillStyle = '#3498db';
+                    ctx.font = `bold ${14 / zoomLevel}px Arial`;
+                    ctx.textAlign = 'center';
+                    let deg = Math.round(s.angle * 180 / Math.PI) % 360;
+                    if (deg < 0) deg += 360;
+                    ctx.fillText(`${deg}°`, 0, -s.h/2 - 45 / zoomLevel);
+                }
+
+                ctx.restore();
+            }
+
+            // Draw Marquee Rect
+            if (isMarqueeDrawing && marqueeRect) {
+                ctx.setLineDash([5, 5]);
+                ctx.strokeStyle = '#3498db';
+                ctx.strokeRect(marqueeRect.x1, marqueeRect.y1, marqueeRect.x2 - marqueeRect.x1, marqueeRect.y2 - marqueeRect.y1);
+                ctx.setLineDash([]);
+            }
+
+            // Draw wall currently in progress
+            if (wallPoints.length > 0) {
+                drawWallPath(ctx, wallPoints, currentColor, wallThickness);
+
+                // Draw preview line from last point to mouse cursor
+                if (isWallMode && hoverPoint) {
+                    const last = wallPoints[wallPoints.length - 1];
+                    ctx.save();
+                    ctx.globalAlpha = 0.4; // Make the preview semi-transparent
+                    drawWallPath(ctx, [last, hoverPoint], currentColor, wallThickness);
+                    ctx.restore();
+                }
+            }
+
+            // Draw curve currently in progress
+            if (curvePoints.length > 0) {
+                drawCurvePath(ctx, [...curvePoints, currentMousePos], currentColor, freehandThickness);
+            }
+
+            // Draw freehand straight line preview
+            if (currentTool === 'draw' && isDrawing && !isWallMode && shiftPressed && lineStart) {
+                ctx.beginPath();
+                ctx.strokeStyle = currentColor;
+                ctx.lineWidth = freehandThickness;
+                ctx.lineCap = 'round';
+                ctx.moveTo(lineStart.x, lineStart.y);
+                ctx.lineTo(currentMousePos.x, currentMousePos.y);
+                ctx.stroke();
+            }
+
+            // Draw shape currently in progress
+            if (currentTool === 'shapes' && isDrawing && currentShapeDims) {
+                ctx.strokeStyle = currentColor;
+                ctx.lineWidth = freehandThickness;
+                const shapeType = document.getElementById('shapeType').value;
+                drawShape(ctx, {
+                    type: shapeType,
+                    ...currentShapeDims,
+                    color: currentColor,
+                    thickness: freehandThickness,
+                    doorType: 0
+                });
+            }
+        }
+
+        function drawWallPath(context, points, color, thickness, windows = []) {
+            if (points.length < 1) return;
+            context.save();
+            context.lineCap = 'square';
+            context.lineJoin = 'miter';
+            
+            // Pass 1: Draw the base wall segments
+            context.beginPath();
+            context.strokeStyle = color;
+            context.lineWidth = thickness;
+            points.forEach((p, i) => {
+                if (i === 0) context.moveTo(p.x, p.y);
+                else context.lineTo(p.x, p.y);
+            });
+            context.stroke();
+
+            // Pass 2: Draw "Hollow" Window overlays
+            context.strokeStyle = 'white';
+            context.lineWidth = Math.max(1, thickness - 2);
+            for (let i = 0; i < points.length - 1; i++) {
+                if (windows[i]) {
+                    context.beginPath();
+                    context.moveTo(points[i].x, points[i].y);
+                    context.lineTo(points[i+1].x, points[i+1].y);
+                    context.stroke();
+                }
+            }
+            context.restore();
+        }
+
+        function drawCurvePath(context, points, color, thickness) {
+            if (points.length < 2) return;
+            context.save();
+            context.beginPath();
+            context.strokeStyle = color;
+            context.lineWidth = thickness;
+            context.lineCap = 'round';
+            context.lineJoin = 'round';
+            context.moveTo(points[0].x, points[0].y);
+            for (let i = 1; i < points.length - 1; i++) {
+                const xc = (points[i].x + points[i + 1].x) / 2;
+                const yc = (points[i].y + points[i + 1].y) / 2;
+                context.quadraticCurveTo(points[i].x, points[i].y, xc, yc);
+            }
+            context.lineTo(points[points.length - 1].x, points[points.length - 1].y);
+            context.stroke();
+            context.restore();
+        }
+
+        function drawShape(context, s) {
+            context.strokeStyle = s.color;
+            context.lineWidth = s.thickness;
+            context.beginPath();
+            if (s.type === 'rect') {
+                context.strokeRect(s.x, s.y, s.w, s.h);
+            } else if (s.type === 'oval') {
+                context.ellipse(s.x + s.w/2, s.y + s.h/2, Math.abs(s.w/2), Math.abs(s.h/2), 0, 0, Math.PI * 2);
+                context.stroke();
+            } else if (s.type === 'door') {
+                const r = Math.max(Math.abs(s.w), Math.abs(s.h));
+                // 8 Types: 4 quadrants * 2 panel starts
+                const q = Math.floor(s.doorType / 2); // quadrant 0-3
+                const side = s.doorType % 2;         // 0=horiz panel, 1=vert panel
+                
+                const startAngles = [0, Math.PI/2, Math.PI, 3*Math.PI/2];
+                const baseAngle = startAngles[q];
+                
+                context.save();
+                context.translate(s.x, s.y);
+                
+                // Draw Door Panel (Radius)
+                context.moveTo(0, 0);
+                const panelAngle = side === 0 ? baseAngle : baseAngle + Math.PI/2;
+                context.lineTo(Math.cos(panelAngle) * r, Math.sin(panelAngle) * r);
+                context.stroke();
+                
+                // Draw Swing (Arc)
+                context.beginPath();
+                if (side === 0) {
+                    context.arc(0, 0, r, baseAngle, baseAngle + Math.PI/2, false);
+                } else {
+                    context.arc(0, 0, r, baseAngle + Math.PI/2, baseAngle, true);
+                }
+                context.stroke();
+                context.restore();
+            }
+        }
+
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            
+            // Translate screen mouse position to internal canvas coordinates based on zoom
+            const x = (e.clientX - rect.left) / zoomLevel;
+            const y = (e.clientY - rect.top) / zoomLevel;
+            
+            const snappedX = snap(x);
+            const snappedY = snap(y);
+            
+            currentMousePos = { x, y };
+            shiftPressed = e.shiftKey;
+            hoverPoint = { x: snappedX, y: snappedY };
+
+            if (currentTool === 'select' && draggedVertexIdx !== -1) {
+                allWalls[selectedWallIdx].points[draggedVertexIdx] = { x: snappedX, y: snappedY };
+                render();
+                return;
+            }
+
+            if (currentTool === 'select' && draggedCurveVertexIdx !== -1) {
+                allCurves[selectedCurveIdx].points[draggedCurveVertexIdx] = { x, y };
+                render();
+                return;
+            }
+
+            if (currentTool === 'select' && isMarqueeDrawing) {
+                marqueeRect.x2 = x;
+                marqueeRect.y2 = y;
+                render();
+                return;
+            }
+
+            if (currentTool === 'select' && activeBitmapSelection && activeHandle) {
+                const s = activeBitmapSelection;
+                const dx = x - dragStartPos.x;
+                const dy = y - dragStartPos.y;
+                dragStartPos = { x, y };
+
+                if (activeHandle === 'move') {
+                    s.x += dx; s.y += dy;
+                } else if (activeHandle === 'rotate') {
+                    const cx = s.x + s.w / 2;
+                    const cy = s.y + s.h / 2;
+                    let newAngle = Math.atan2(y - cy, x - cx) + Math.PI / 2;
+                    
+                    if (sKeyPressed) {
+                        const step = 10 * (Math.PI / 180);
+                        newAngle = Math.round(newAngle / step) * step;
+                    }
+                    s.angle = newAngle;
+                } else {
+                    const oldW = s.w;
+                    const oldH = s.h;
+
+                    if (activeHandle.includes('r')) s.w += dx * 2;
+                    if (activeHandle.includes('l')) s.w -= dx * 2;
+                    if (activeHandle.includes('b')) s.h += dy * 2;
+                    if (activeHandle.includes('t')) s.h -= dy * 2;
+
+                    if (shiftPressed) {
+                        const ratio = s.originalH / s.originalW;
+                        if (activeHandle === 'r' || activeHandle === 'l') {
+                            s.h = s.w * ratio;
+                        } else if (activeHandle === 't' || activeHandle === 'b') {
+                            s.w = s.h / ratio;
+                        } else {
+                            // Corner handles: maintain ratio based on the dimension with larger change
+                            if (Math.abs(s.w - s.originalW) > Math.abs(s.h - s.originalH)) s.h = s.w * ratio;
+                            else s.w = s.h / ratio;
+                        }
+                    }
+
+                    s.w = Math.max(10, s.w);
+                    s.h = Math.max(10, s.h);
+                    
+                    // Re-center x and y since the width/height changes were symmetric
+                    s.x -= (s.w - oldW) / 2;
+                    s.y -= (s.h - oldH) / 2;
+                }
+                render();
+                return;
+            }
+
+            if (currentTool === 'select' && isDraggingEntireObject) {
+                const dx = x - dragStartPos.x;
+                const dy = y - dragStartPos.y;
+                dragStartPos = { x, y };
+
+                if (selectedWallIdx !== -1) {
+                    allWalls[selectedWallIdx].points.forEach(p => {
+                        p.x += dx;
+                        p.y += dy;
+                    });
+                } else if (selectedCurveIdx !== -1) {
+                    allCurves[selectedCurveIdx].points.forEach(p => {
+                        p.x += dx;
+                        p.y += dy;
+                    });
+                } else if (selectedShapeIdx !== -1) {
+                    allShapes[selectedShapeIdx].x += dx;
+                    allShapes[selectedShapeIdx].y += dy;
+                } else if (selectedLabelIdx !== -1) {
+                    allLabels[selectedLabelIdx].x += dx;
+                    allLabels[selectedLabelIdx].y += dy;
+                }
+                render();
+                return;
+            }
+
+            // Refresh for wall preview even when not dragging
+            if (isWallMode || isCurveMode) {
+                render();
+                return;
+            }
+
+            if (!isDrawing || isWallMode || isCurveMode) return;
+            
+            if (currentTool === 'draw') {
+                if (!e.shiftKey) {
+                    offscreenCtx.lineTo(x, y);
+                    offscreenCtx.stroke();
+                }
+            } else if (currentTool === 'erase') {
+                offscreenCtx.beginPath();
+                offscreenCtx.arc(x, y, eraserSize, 0, Math.PI * 2);
+                offscreenCtx.fill();
+            } else if (currentTool === 'shapes' && shapeStart) {
+                let dx = x - shapeStart.x;
+                let dy = y - shapeStart.y;
+                if (e.shiftKey) {
+                    const side = Math.max(Math.abs(dx), Math.abs(dy));
+                    dx = Math.sign(dx) * side;
+                    dy = Math.sign(dy) * side;
+                }
+                currentShapeDims = { x: shapeStart.x, y: shapeStart.y, w: sKeyPressed ? snap(dx) : dx, h: sKeyPressed ? snap(dy) : dy };
+            }
+            render();
+        });
+
+        window.addEventListener('mouseup', (e) => {
+            const wasActing = isDrawing || draggedVertexIdx !== -1 || draggedCurveVertexIdx !== -1 || isDraggingEntireObject || activeHandle;
+            
+            if (isMarqueeDrawing && marqueeRect) {
+                startBitmapSelection(marqueeRect);
+                isMarqueeDrawing = false;
+                marqueeRect = null;
+            }
+
+            if (currentTool === 'shapes' && isDrawing && currentShapeDims) {
+                const newShape = {
+                    type: document.getElementById('shapeType').value,
+                    ...currentShapeDims,
+                    color: currentColor,
+                    thickness: freehandThickness,
+                    doorType: 0
+                };
+                allShapes.push(newShape);
+                selectedShapeIdx = allShapes.length - 1;
+            }
+
+            if (currentTool === 'draw' && isDrawing && !isWallMode && e.shiftKey && lineStart) {
+                offscreenCtx.lineTo(currentMousePos.x, currentMousePos.y);
+                offscreenCtx.stroke();
+            }
+
+            isDrawing = false;
+            draggedVertexIdx = -1;
+            draggedCurveVertexIdx = -1;
+            isDraggingEntireObject = false;
+            activeHandle = null;
+            shapeStart = null;
+            lineStart = null;
+            currentShapeDims = null;
+            offscreenCtx.beginPath();
+
+            if (wasActing) saveState();
+            render();
+        });
+
+        window.addEventListener('keydown', (e) => {
+            if (is3DActive) {
+                switch (e.code) {
+                    case 'KeyW': moveForward = true; break;
+                    case 'KeyA': moveLeft = true; break;
+                    case 'KeyS': moveBackward = true; break;
+                    case 'KeyD': moveRight = true; break;
+                    case 'Space':
+                        if (canJump === true) velocity.y += 350;
+                        canJump = false;
+                        break;
+                }
+                if (e.code === 'Space') e.preventDefault();
+                return;
+            }
+            if (e.code === 'KeyS') sKeyPressed = true;
+
+            if (currentTool === 'draw') {
+                const key = e.key.toLowerCase();
+                if (key === 'w') {
+                    if (isCurveMode) finishCurrentCurve();
+                    isWallMode = true;
+                    isCurveMode = false;
+                    updateStatus();
+                    render();
+                } else if (key === 'c') {
+                    if (isWallMode) finishCurrentWall();
+                    isCurveMode = true;
+                    isWallMode = false;
+                    updateStatus();
+                    render();
+                } else if (key === 'd') {
+                    if (isWallMode) finishCurrentWall();
+                    if (isCurveMode) finishCurrentCurve();
+                    isWallMode = false;
+                    isCurveMode = false;
+                    updateStatus();
+                    render();
+                }
+            }
+
+            if (e.key === ' ') {
+                e.preventDefault();
+                if (isWallMode) finishCurrentWall();
+                if (isCurveMode) finishCurrentCurve();
+                render();
+            }
+
+            // Segment Window Toggle
+            if (e.key.toLowerCase() === 'e' && currentTool === 'select') {
+                let found = false;
+                allWalls.forEach(wall => {
+                    if (!wall.windows) wall.windows = new Array(wall.points.length - 1).fill(false);
+                    for (let i = 0; i < wall.points.length - 1; i++) {
+                        if (distToSegment(currentMousePos, wall.points[i], wall.points[i+1]) < 10) {
+                            wall.windows[i] = !wall.windows[i];
+                            found = true;
+                            break;
+                        }
+                    }
+                });
+                if (found) {
+                    saveState();
+                    render();
+                }
+            }
+
+            if (e.key === 'Backspace' || e.key === 'Delete') {
+                if (currentTool === 'select' && selectedWallIdx !== -1) {
+                    allWalls.splice(selectedWallIdx, 1);
+                    selectedWallIdx = -1;
+                }
+                if (currentTool === 'select' && selectedCurveIdx !== -1) {
+                    allCurves.splice(selectedCurveIdx, 1);
+                    selectedCurveIdx = -1;
+                }
+                if (selectedShapeIdx !== -1) {
+                    allShapes.splice(selectedShapeIdx, 1);
+                    selectedShapeIdx = -1;
+                }
+                if (selectedLabelIdx !== -1) {
+                    allLabels.splice(selectedLabelIdx, 1);
+                    selectedLabelIdx = -1;
+                }
+                saveState();
+                render();
+            }
+
+            // Door Orientation Shortcuts
+            if (selectedShapeIdx !== -1 && allShapes[selectedShapeIdx].type === 'door') {
+                if (e.key === 'ArrowRight') {
+                    allShapes[selectedShapeIdx].doorType = (allShapes[selectedShapeIdx].doorType + 1) % 8;
+                    saveState();
+                    render();
+                } else if (e.key === 'ArrowLeft') {
+                    allShapes[selectedShapeIdx].doorType = (allShapes[selectedShapeIdx].doorType + 7) % 8;
+                    saveState();
+                    render();
+                }
+            }
+
+            // Zoom Shortcuts
+            if (e.code === 'KeyZ' && !e.ctrlKey && !e.metaKey) {
+                e.preventDefault();
+                if (e.altKey) zoomLevel = Math.max(0.2, zoomLevel - 0.1); // Zoom Out
+                else zoomLevel = Math.min(4.0, zoomLevel + 0.1);         // Zoom In
+                applyZoom();
+                updateStatus();
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (is3DActive) {
+                switch (e.code) {
+                    case 'KeyW': moveForward = false; break;
+                    case 'KeyA': moveLeft = false; break;
+                    case 'KeyS': moveBackward = false; break;
+                    case 'KeyD': moveRight = false; break;
+                }
+                return;
+            }
+            if (e.code === 'KeyS') sKeyPressed = false;
+        });
+
+        function clearCanvas() {
+            offscreenCtx.clearRect(0, 0, offscreenCanvas.width, offscreenCanvas.height);
+            allWalls = [];
+            allShapes = [];
+            allCurves = [];
+            allLabels = [];
+            wallPoints = [];
+            selectedWallIdx = -1;
+            saveState();
+            render();
+        }
+
+        function init3D() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x87ceeb); // Sky blue
+            
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 10000);
+            
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.getElementById('three-canvas-container').appendChild(renderer.domElement);
+            
+            controls = new THREE.PointerLockControls(camera, document.body);
+            scene.add(controls.getObject());
+            
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+            scene.add(ambientLight);
+            
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            dirLight.position.set(500, 1000, 250);
+            scene.add(dirLight);
+            
+            // Ground
+            const groundGeo = new THREE.PlaneGeometry(20000, 20000);
+            const groundMat = new THREE.MeshPhongMaterial({ color: 0x555555, side: THREE.DoubleSide });
+            const ground = new THREE.Mesh(groundGeo, groundMat);
+            ground.rotation.x = -Math.PI / 2;
+            scene.add(ground);
+            
+            // Add a grid for better spatial awareness and contrast
+            const gridHelper = new THREE.GridHelper(20000, 200, 0x888888, 0x444444);
+            gridHelper.position.y = 0.5; // Slightly above ground to prevent z-fighting
+            scene.add(gridHelper);
+            
+            wallsGroup = new THREE.Group();
+            scene.add(wallsGroup);
+            
+            doorsGroup = new THREE.Group();
+            scene.add(doorsGroup);
+            
+            document.getElementById('three-container').addEventListener('click', () => {
+                if (is3DActive) controls.lock();
+            });
+            
+            controls.addEventListener('lock', () => {
+                document.getElementById('three-instructions').style.display = 'none';
+            });
+            
+            controls.addEventListener('unlock', () => {
+                if (is3DActive) document.getElementById('three-instructions').style.display = 'block';
+            });
+
+            animate3D();
+            
+            window.addEventListener('resize', () => {
+                if (renderer) {
+                    camera.aspect = window.innerWidth / window.innerHeight;
+                    camera.updateProjectionMatrix();
+                    renderer.setSize(window.innerWidth, window.innerHeight);
+                }
+            });
+        }
+
+        function update3DScene() {
+            wallsGroup.clear();
+            doorsGroup.clear();
+            allDoorMeshes = [];
+            const wallHeight = 100;
+            
+            // Materials for the 3D walls to distinguish the top from the sides
+            const sideMat = new THREE.MeshPhongMaterial({ color: 0xffffff });
+            const topMat = new THREE.MeshPhongMaterial({ color: 0xdddddd }); // Light gray cap for depth
+            const wallMaterials = [sideMat, sideMat, topMat, sideMat, sideMat, sideMat];
+
+            allWalls.forEach(wall => {
+                for (let i = 0; i < wall.points.length - 1; i++) {
+                    const p1 = wall.points[i];
+                    const p2 = wall.points[i+1];
+                    const dx = p2.x - p1.x;
+                    const dz = p2.y - p1.y;
+                    const distance = Math.sqrt(dx*dx + dz*dz);
+                    const angle = Math.atan2(dz, dx);
+
+                    if (wall.windows && wall.windows[i]) {
+                        // Window segment: split into sill (bottom) and lintel (top)
+                        const sillH = wallHeight * 0.35;
+                        const lintelH = wallHeight * 0.25;
+
+                        const sillGeo = new THREE.BoxGeometry(distance, sillH, wall.thickness);
+                        const sillMesh = new THREE.Mesh(sillGeo, wallMaterials);
+                        sillMesh.position.set(p1.x + dx/2, sillH/2, p1.y + dz/2);
+                        sillMesh.rotation.y = -angle;
+                        wallsGroup.add(sillMesh);
+
+                        const lintelGeo = new THREE.BoxGeometry(distance, lintelH, wall.thickness);
+                        const lintelMesh = new THREE.Mesh(lintelGeo, wallMaterials);
+                        lintelMesh.position.set(p1.x + dx/2, wallHeight - lintelH/2, p1.y + dz/2);
+                        lintelMesh.rotation.y = -angle;
+                        wallsGroup.add(lintelMesh);
+                    } else {
+                        const geo = new THREE.BoxGeometry(distance, wallHeight, wall.thickness);
+                        const mesh = new THREE.Mesh(geo, wallMaterials);
+                        mesh.position.set(p1.x + dx/2, wallHeight/2, p1.y + dz/2);
+                        mesh.rotation.y = -angle;
+                        wallsGroup.add(mesh);
+                    }
+                }
+            });
+
+            allShapes.forEach((s) => {
+                if (s.type === 'door') {
+                    const r = Math.max(Math.abs(s.w), Math.abs(s.h));
+                    const q = Math.floor(s.doorType / 2);
+                    const side = s.doorType % 2;
+                    const startAngles = [0, Math.PI / 2, Math.PI, 3 * Math.PI / 2];
+                    const baseAngle = startAngles[q];
+                    
+                    // In 2D floor plans, doors are represented in their open state.
+                    // We swap definitions so the 3D default (at a distance) is the closed state.
+                    const openAngle = side === 0 ? baseAngle : baseAngle + Math.PI / 2;
+                    const closedAngle = side === 0 ? openAngle + Math.PI / 2 : openAngle - Math.PI / 2;
+
+                    const frameMat = new THREE.MeshPhongMaterial({ color: 0xcccccc });
+                    const doorLeafMat = new THREE.MeshPhongMaterial({ color: s.color });
+
+                    const pivot = new THREE.Group();
+                    pivot.position.set(s.x, 0, s.y);
+
+                    const doorLeafGeo = new THREE.BoxGeometry(r, wallHeight, 4);
+                    doorLeafGeo.translate(r / 2, wallHeight / 2, 0);
+                    const doorLeaf = new THREE.Mesh(doorLeafGeo, doorLeafMat);
+                    
+                    pivot.add(doorLeaf);
+                    pivot.rotation.y = -closedAngle;
+
+                    const postWidth = 4;
+                    const postGeo = new THREE.BoxGeometry(postWidth, wallHeight, 8);
+                    const leftPost = new THREE.Mesh(postGeo, frameMat);
+                    leftPost.position.set(s.x, wallHeight / 2, s.y);
+                    doorsGroup.add(leftPost);
+
+                    const rightPost = new THREE.Mesh(postGeo, frameMat);
+                    rightPost.position.set(s.x + r * Math.cos(closedAngle), wallHeight / 2, s.y + r * Math.sin(closedAngle));
+                    doorsGroup.add(rightPost);
+
+                    const topBarGeo = new THREE.BoxGeometry(r, postWidth, 8);
+                    const topBar = new THREE.Mesh(topBarGeo, frameMat);
+                    topBar.position.set(s.x + (r / 2) * Math.cos(closedAngle), wallHeight - postWidth / 2, s.y + (r / 2) * Math.sin(closedAngle));
+                    topBar.rotation.y = -closedAngle;
+                    doorsGroup.add(topBar);
+
+                    allDoorMeshes.push({
+                        mesh: pivot,
+                        originalX: s.x,
+                        originalZ: s.y,
+                        closedAngle: -closedAngle,
+                        openAngle: -openAngle,
+                        currentProgress: 0,
+                        targetProgress: 0
+                    });
+                    doorsGroup.add(pivot);
+                }
+            });
+
+            if (camera.position.x === 0 && camera.position.z === 0) {
+                camera.position.set(gridCols * grid / 2, 50, gridRows * grid / 2);
+            }
+        }
+
+        function check3DCollision(x, z) {
+            const playerRadius = 15; // Padding around the user to prevent clipping
+            for (const wall of allWalls) {
+                for (let i = 0; i < wall.points.length - 1; i++) {
+                    const p1 = wall.points[i];
+                    const p2 = wall.points[i+1];
+                    // Map 3D (x, z) to 2D (x, y) for distance calculation
+                    const dist = distToSegment({x, y: z}, p1, p2);
+                    if (dist < (wall.thickness / 2 + playerRadius)) return true;
+                }
+            }
+            return false;
+        }
+
+        function updateMinimap() {
+            const mCanvas = document.getElementById('three-minimap');
+            if (!mCanvas || !controls) return;
+            const mCtx = mCanvas.getContext('2d');
+            
+            mCtx.clearRect(0, 0, mCanvas.width, mCanvas.height);
+            
+            const planW = gridCols * grid;
+            const planH = gridRows * grid;
+            const scale = Math.min(mCanvas.width / planW, mCanvas.height / planH) * 0.9;
+            
+            const offX = (mCanvas.width - planW * scale) / 2;
+            const offY = (mCanvas.height - planH * scale) / 2;
+            
+            mCtx.save();
+            mCtx.translate(offX, offY);
+            
+            // Draw walls and windows using the original drawing functions
+            allWalls.forEach(wall => {
+                const scaledPoints = wall.points.map(p => ({ x: p.x * scale, y: p.y * scale }));
+                drawWallPath(mCtx, scaledPoints, wall.color, wall.thickness, wall.windows);
+            });
+
+            // Draw doors using the original drawing functions
+            allShapes.forEach(s => {
+                if (s.type === 'door') {
+                    const scaledS = { ...s, x: s.x * scale, y: s.y * scale, w: s.w * scale, h: s.h * scale };
+                    drawShape(mCtx, scaledS);
+                }
+            });
+            
+            const playerObj = controls.getObject();
+            
+            // Draw player marker
+            mCtx.fillStyle = '#ff8000';
+            mCtx.beginPath();
+            mCtx.arc(playerObj.position.x * scale, playerObj.position.z * scale, 5, 0, Math.PI * 2);
+            mCtx.fill();
+            
+            mCtx.restore();
+        }
+
+        function animate3D() {
+            requestAnimationFrame(animate3D);
+            const time = performance.now();
+            const delta = (time - prevTime) / 1000;
+
+            if (controls && controls.isLocked) {
+                velocity.x -= velocity.x * 10.0 * delta;
+                velocity.z -= velocity.z * 10.0 * delta;
+                velocity.y -= 9.8 * 100.0 * delta; // Gravity
+
+                direction.z = Number(moveForward) - Number(moveBackward);
+                direction.x = Number(moveRight) - Number(moveLeft);
+                direction.normalize();
+                if (moveForward || moveBackward) velocity.z -= direction.z * moveSpeed3D * delta;
+                if (moveLeft || moveRight) velocity.x -= direction.x * moveSpeed3D * delta;
+
+                const playerObj = controls.getObject();
+
+                // Vertical movement and ground check
+                playerObj.position.y += (velocity.y * delta);
+                if (playerObj.position.y < 50) {
+                    velocity.y = 0;
+                    playerObj.position.y = 50;
+                    canJump = true;
+                }
+
+                const oldX = playerObj.position.x;
+                const oldZ = playerObj.position.z;
+
+                // Move X-axis (Right/Left) and resolve collisions
+                controls.moveRight(-velocity.x * delta);
+                if (check3DCollision(playerObj.position.x, playerObj.position.z)) {
+                    playerObj.position.x = oldX;
+                    playerObj.position.z = oldZ;
+                }
+
+                // Move Z-axis (Forward/Backward) and resolve collisions
+                const midX = playerObj.position.x;
+                const midZ = playerObj.position.z;
+                controls.moveForward(-velocity.z * delta);
+                if (check3DCollision(playerObj.position.x, playerObj.position.z)) {
+                    playerObj.position.x = midX;
+                    playerObj.position.z = midZ;
+                }
+
+                allDoorMeshes.forEach(door => {
+                    const dist = Math.hypot(playerObj.position.x - door.originalX, playerObj.position.z - door.originalZ);
+                    door.targetProgress = dist < 120 ? 1 : 0;
+
+                    if (Math.abs(door.currentProgress - door.targetProgress) > 0.01) {
+                        const step = 3 * delta;
+                        if (door.currentProgress < door.targetProgress) {
+                            door.currentProgress = Math.min(door.targetProgress, door.currentProgress + step);
+                        } else {
+                            door.currentProgress = Math.max(door.targetProgress, door.currentProgress - step);
+                        }
+                        const angle = door.closedAngle + (door.openAngle - door.closedAngle) * door.currentProgress;
+                        door.mesh.rotation.y = angle;
+                    }
+                });
+            }
+
+            prevTime = time;
+            if (renderer) {
+                renderer.render(scene, camera);
+                if (is3DActive) updateMinimap();
+            }
+        }
+
+        function toggle3D() {
+            const container = document.getElementById('three-container');
+            is3DActive = !is3DActive;
+            if (is3DActive) {
+                container.style.display = 'block';
+                if (!renderer) init3D();
+                update3DScene();
+                velocity.set(0, 0, 0);
+                canJump = true;
+                prevTime = performance.now();
+            } else {
+                container.style.display = 'none';
+                if (controls) controls.unlock();
+            }
+        }
+
+        function toggleDownloadMenu() {
+            const menu = document.getElementById('download-menu');
+            menu.style.display = menu.style.display === 'flex' ? 'none' : 'flex';
+            document.getElementById('settings-menu').style.display = 'none';
+        }
+
+        function toggleSettings() {
+            const menu = document.getElementById('settings-menu');
+            menu.style.display = menu.style.display === 'flex' ? 'none' : 'flex';
+            document.getElementById('download-menu').style.display = 'none';
+        }
+
+        function toggleInfo() {
+            const modal = document.getElementById('info-modal');
+            modal.style.display = (modal.style.display === 'flex') ? 'none' : 'flex';
+        }
+
+        function getDrawingBounds() {
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            let found = false;
+
+            allWalls.forEach(wall => {
+                wall.points.forEach(p => {
+                    minX = Math.min(minX, p.x); minY = Math.min(minY, p.y);
+                    maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y);
+                    found = true;
+                });
+            });
+
+            allCurves.forEach(curve => {
+                curve.points.forEach(p => {
+                    minX = Math.min(minX, p.x); minY = Math.min(minY, p.y);
+                    maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y);
+                });
+            });
+
+            allShapes.forEach(s => {
+                const r = s.type === 'door' ? Math.max(Math.abs(s.w), Math.abs(s.h)) : 0;
+                minX = Math.min(minX, s.x - r); minY = Math.min(minY, s.y - r);
+                maxX = Math.max(maxX, s.x + Math.max(s.w, r)); maxY = Math.max(maxY, s.y + Math.max(s.h, r));
+                found = true;
+            });
+
+            allLabels.forEach(l => {
+                ctx.font = `${l.size}px Arial`;
+                const w = ctx.measureText(l.text).width;
+                minX = Math.min(minX, l.x); minY = Math.min(minY, l.y - l.size);
+                maxX = Math.max(maxX, l.x + w); maxY = Math.max(maxY, l.y);
+                found = true;
+            });
+
+            const data = offscreenCtx.getImageData(0, 0, offscreenCanvas.width, offscreenCanvas.height).data;
+            for (let y = 0; y < offscreenCanvas.height; y++) {
+                for (let x = 0; x < offscreenCanvas.width; x++) {
+                    if (data[(y * offscreenCanvas.width + x) * 4 + 3] > 0) {
+                        minX = Math.min(minX, x); minY = Math.min(minY, y);
+                        maxX = Math.max(maxX, x); maxY = Math.max(maxY, y);
+                        found = true;
+                    }
+                }
+            }
+            return found ? { x: minX, y: minY, w: maxX - minX, h: maxY - minY } : null;
+        }
+
+        function drawGridOnContext(context, width, height, offsetX, offsetY) {
+            context.strokeStyle = '#e0e0e0';
+            context.lineWidth = 1;
+            for (let x = (grid - (offsetX % grid)) % grid; x < width; x += grid) {
+                context.beginPath(); context.moveTo(x, 0); context.lineTo(x, height); context.stroke();
+            }
+            for (let y = (grid - (offsetY % grid)) % grid; y < height; y += grid) {
+                context.beginPath(); context.moveTo(0, y); context.lineTo(width, y); context.stroke();
+            }
+        }
+
+        function downloadCanvas(mode) {
+            let exportW, exportH, offX = 0, offY = 0;
+            if (mode === 'crop') {
+                const bounds = getDrawingBounds();
+                if (!bounds) return alert("Canvas is empty!");
+                offX = bounds.x - downloadMargin; offY = bounds.y - downloadMargin;
+                exportW = bounds.w + downloadMargin * 2; exportH = bounds.h + downloadMargin * 2;
+            } else {
+                exportW = canvas.width; exportH = canvas.height;
+            }
+
+            const temp = document.createElement('canvas');
+            temp.width = exportW; temp.height = exportH;
+            const tCtx = temp.getContext('2d');
+            
+            tCtx.fillStyle = 'white';
+            tCtx.fillRect(0, 0, exportW, exportH);
+            if (includeGridInDownload) drawGridOnContext(tCtx, exportW, exportH, offX, offY);
+            
+            allWalls.forEach(wall => {
+                const shifted = wall.points.map(p => ({ x: p.x - offX, y: p.y - offY }));
+                drawWallPath(tCtx, shifted, wall.color, wall.thickness, wall.windows || []);
+            });
+            allCurves.forEach(curve => {
+                const shifted = curve.points.map(p => ({ x: p.x - offX, y: p.y - offY }));
+                drawCurvePath(tCtx, shifted, curve.color, curve.thickness);
+            });
+            allShapes.forEach(s => {
+                drawShape(tCtx, { ...s, x: s.x - offX, y: s.y - offY });
+            });
+            allLabels.forEach(l => {
+                tCtx.fillStyle = l.color;
+                tCtx.font = `${l.size}px Arial`;
+                tCtx.fillText(l.text, l.x - offX, l.y - offY);
+            });
+            tCtx.drawImage(offscreenCanvas, offX, offY, exportW, exportH, 0, 0, exportW, exportH);
+
+            const link = document.createElement('a');
+            link.download = `floor-plan-${Date.now()}.png`;
+            link.href = temp.toDataURL();
+            link.click();
+            document.getElementById('download-menu').style.display = 'none';
+        }
+
+        function showBrushPreview(size, isEraser = false) {
+            // Scale the preview circle to match the visual size on screen
+            const scaledSize = size * zoomLevel;
+            brushPreview.style.width = scaledSize + 'px';
+            brushPreview.style.height = scaledSize + 'px';
+            brushPreview.style.left = lastMouseX + 'px';
+            brushPreview.style.top = (lastMouseY - (scaledSize/2 + 40)) + 'px'; 
+            
+            if (isEraser) {
+                brushPreview.style.background = 'rgba(255, 255, 255, 0.2)';
+                brushPreview.style.border = '1px dashed #fff';
+            } else {
+                brushPreview.style.background = 'rgba(255, 255, 255, 0.4)'; 
+                brushPreview.style.border = '1px solid #fff';
+            }
+
+            brushPreview.style.display = 'block';
+            clearTimeout(previewTimeout);
+            previewTimeout = setTimeout(() => {
+                brushPreview.style.display = 'none';
+            }, 1000);
+        }
+
+        function commitText() {
+            const textInput = document.getElementById('canvas-text-input');
+            if (textInput.style.display === 'block') {
+                const val = textInput.value.trim();
+                if (val && pendingTextPos) {
+                    if (editingLabelIdx !== -1) {
+                        allLabels[editingLabelIdx].text = val;
+                    } else {
+                        allLabels.push({ 
+                            text: val, 
+                            x: pendingTextPos.x, 
+                            y: pendingTextPos.y, 
+                            color: currentColor, 
+                            size: fontSize 
+                        });
+                    }
+                    saveState();
+                } else if (editingLabelIdx !== -1 && !val) {
+                    // If the text is cleared during editing, remove the label
+                    allLabels.splice(editingLabelIdx, 1);
+                    selectedLabelIdx = -1;
+                    saveState();
+                }
+                textInput.style.display = 'none';
+                pendingTextPos = null;
+                editingLabelIdx = -1;
+                render();
+            }
+        }
+
+        function updateSettings(source) {
+            const fSlider = document.getElementById('freehandSlider');
+            const wSlider = document.getElementById('wallSlider');
+            const eSlider = document.getElementById('eraserSlider');
+            const mSlider = document.getElementById('marginSlider');
+            const gCheck = document.getElementById('gridDownloadCheckbox');
+            const sSlider = document.getElementById('snapPointsSlider');
+            const fsSlider = document.getElementById('fontSizeSlider');
+            const s3dSlider = document.getElementById('speed3DSlider');
+
+            freehandThickness = parseInt(fSlider.value);
+            wallThickness = parseInt(wSlider.value);
+            eraserSize = parseInt(eSlider.value);
+            downloadMargin = parseInt(mSlider.value);
+            includeGridInDownload = gCheck.checked;
+            pointsPerUnit = parseInt(sSlider.value);
+            fontSize = parseInt(fsSlider.value);
+            moveSpeed3D = parseInt(s3dSlider.value);
+            
+            document.getElementById('freehandVal').innerText = freehandThickness;
+            document.getElementById('wallVal').innerText = wallThickness;
+            document.getElementById('eraserVal').innerText = eraserSize;
+            document.getElementById('marginVal').innerText = downloadMargin;
+            document.getElementById('snapPointsVal').innerText = pointsPerUnit;
+            document.getElementById('fontSizeVal').innerText = fontSize;
+            document.getElementById('speed3DVal').innerText = moveSpeed3D;
+
+            const fPreview = document.getElementById('font-preview');
+            if (fPreview) fPreview.style.fontSize = fontSize + 'px';
+
+            if (source === 'freehand') showBrushPreview(freehandThickness);
+            if (source === 'wall') showBrushPreview(wallThickness);
+            if (source === 'eraser') showBrushPreview(eraserSize * 2, true); // eraserSize is used as radius in drawing
+        }
+
+        function hexToRgb(hex) {
+            const r = parseInt(hex.slice(1, 3), 16);
+            const g = parseInt(hex.slice(3, 5), 16);
+            const b = parseInt(hex.slice(5, 7), 16);
+            return { r, g, b };
+        }
+
+        function floodFill(startX, startY, fillRGB) {
+            const w = offscreenCanvas.width;
+            const h = offscreenCanvas.height;
+            startX = Math.floor(startX);
+            startY = Math.floor(startY);
+
+            if (startX < 0 || startX >= w || startY < 0 || startY >= h) return;
+
+            // Create a temporary "hit map" canvas to find boundaries (bitmap + walls + shapes)
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = w; tempCanvas.height = h;
+            const tCtx = tempCanvas.getContext('2d');
+            tCtx.drawImage(offscreenCanvas, 0, 0);
+            allWalls.forEach(wall => drawWallPath(tCtx, wall.points, wall.color, wall.thickness, wall.windows));
+            allShapes.forEach(s => drawShape(tCtx, s));
+
+            const hitData = tCtx.getImageData(0, 0, w, h).data;
+            const targetIdx = (startY * w + startX) * 4;
+            const tr = hitData[targetIdx], tg = hitData[targetIdx+1], tb = hitData[targetIdx+2], ta = hitData[targetIdx+3];
+
+            // If we're clicking on a pixel already set to the fill color, do nothing
+            if (tr === fillRGB.r && tg === fillRGB.g && tb === fillRGB.b && ta === 255) return;
+
+            const visited = new Uint8Array(w * h);
+            const stack = [[startX, startY]];
+            const bitmapData = offscreenCtx.getImageData(0, 0, w, h);
+            const pixels = bitmapData.data;
+
+            while (stack.length > 0) {
+                const [x, y] = stack.pop();
+                if (x < 0 || x >= w || y < 0 || y >= h) continue;
+                const pos = y * w + x;
+                if (visited[pos]) continue;
+                visited[pos] = 1;
+                const idx = pos * 4;
+
+                if (hitData[idx] === tr && hitData[idx+1] === tg && hitData[idx+2] === tb && hitData[idx+3] === ta) {
+                    pixels[idx] = fillRGB.r; pixels[idx+1] = fillRGB.g; pixels[idx+2] = fillRGB.b; pixels[idx+3] = 255;
+                    stack.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]);
+                }
+            }
+            offscreenCtx.putImageData(bitmapData, 0, 0);
+        }
+
+        function updateGridSize() {
+            const colsSlider = document.getElementById('colsSlider');
+            const rowsSlider = document.getElementById('rowsSlider');
+            gridCols = parseInt(colsSlider.value);
+            gridRows = parseInt(rowsSlider.value);
+            document.getElementById('colsVal').innerText = gridCols;
+            document.getElementById('rowsVal').innerText = gridRows;
+
+            // Resizing a canvas clears it, so we capture the current bitmap state first
+            const temp = offscreenCtx.getImageData(0, 0, offscreenCanvas.width, offscreenCanvas.height);
+            initCanvas();
+            // Restore existing drawings (they will be clipped if shrinking the grid)
+            offscreenCtx.putImageData(temp, 0, 0);
+            saveState();
+            render();
+        }
+
+        function finishCurrentCurve() {
+            if (curvePoints.length > 1) {
+                allCurves.push({
+                    points: [...curvePoints],
+                    color: currentColor,
+                    thickness: freehandThickness
+                });
+                saveState();
+            }
+            curvePoints = [];
+        }
+
+        // Prevent context menu on right click to allow for custom wall editing
+        canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+        // Setup text input events
+        const textInput = document.getElementById('canvas-text-input');
+        textInput.addEventListener('blur', commitText);
+        textInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') textInput.blur();
+            if (e.key === 'Escape') {
+                textInput.value = ''; // Clear value so commitText ignores it
+                textInput.blur();
+            }
+        });
+
+        initCanvas();
+        saveState();
+        updateSettings();
+        updateStatus();
+    </script>
+</body>
+</html>

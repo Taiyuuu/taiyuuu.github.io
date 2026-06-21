@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connect 4 vs AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        /* Fallback / Custom Utility for Disc Drops */
+        .cell-inner::after {
+            content: '';
+            position: absolute;
+            inset: 4px;
+            border-radius: 9999px;
+            transition: transform 0.15s ease;
+        }
+        .cell-red::after { background-color: #ef4444; box-shadow: inset 0 -4px 0 #b91c1c; }
+        .cell-yellow::after { background-color: #eab308; box-shadow: inset 0 -4px 0 #a16207; }
+
+        .animate-drop::after {
+            animation: drop 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        @keyframes drop {
+            0% { transform: translateY(-500px); opacity: 0; }
+            60% { transform: translateY(0); opacity: 1; }
+            80% { transform: translateY(-12px); }
+            100% { transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col justify-center items-center p-4 antialiased selection:bg-indigo-500 selection:text-white">
+
+    <div class="w-full max-w-4xl flex flex-col lg:flex-row gap-8 items-center justify-center">
+        
+        <div class="w-full lg:w-80 bg-slate-800/80 backdrop-blur-md p-6 rounded-2xl shadow-xl border border-slate-700/50 flex flex-col gap-6">
+            <div class="flex items-center gap-3 border-b border-slate-700 pb-4">
+                <i data-lucide="gamepad-2" class="w-8 h-8 text-indigo-400"></i>
+                <div>
+                    <h1 class="text-xl font-black tracking-wide bg-gradient-to-r cb from-indigo-400 to-cyan-400 bg-clip-text text-transparent">CONNECT 4</h1>
+                    <p class="text-xs text-slate-400 font-medium">Tactical Grid Match</p>
+                </div>
+            </div>
+
+            <div class="flex bg-slate-950 p-1 rounded-xl border border-slate-800">
+                <button id="mode-ai" class="flex-1 flex items-center justify-center gap-2 py-2 px-3 text-sm font-semibold rounded-lg transition-all duration-200 bg-indigo-600 text-white shadow">
+                    <i data-lucide="cpu" class="w-4 h-4"></i> Vs AI
+                </button>
+                <button id="mode-pvp" class="flex-1 flex items-center justify-center gap-2 py-2 px-3 text-sm font-semibold text-slate-400 rounded-lg hover:text-slate-200 transition-all duration-200">
+                    <i data-lucide="users" class="w-4 h-4"></i> Local PvP
+                </button>
+            </div>
+            
+            <div id="ai-controls" class="space-y-5 transition-all duration-300">
+                <div class="space-y-2">
+                    <label class="text-xs font-semibold text-slate-400 tracking-wider uppercase flex items-center gap-1.5">
+                        <i data-lucide="palette" class="w-3..5 h-3.5"></i> Choose Alliance
+                    </label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button id="play-red" class="flex items-center justify-center gap-2 py-2 px-3 border-2 border-indigo-500 bg-indigo-500/10 text-red-400 rounded-xl text-sm font-bold shadow-sm transition">
+                            <span class="w-3 h-3 rounded-full bg-red-500"></span> Red
+                        </button>
+                        <button id="play-yellow" class="flex items-center justify-center gap-2 py-2 px-3 border border-slate-700 hover:border-slate-600 text-slate-400 hover:text-slate-200 rounded-xl text-sm font-bold transition">
+                            <span class="w-3 h-3 rounded-full bg-yellow-500"></span> Yellow
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="space-y-2 bg-slate-950/50 p-3 rounded-xl border border-slate-800">
+                    <div class="flex justify-between text-xs font-semibold text-slate-400">
+                        <span class="flex items-center gap-1.5"><i data-lucide="zap" class="w-3.5 h-3.5 text-yellow-500"></i> AI Intelligence Level</span>
+                        <span id="strength-val" class="text-indigo-400 font-mono text-sm bg-indigo-500/10 px-1.5 rounded">4</span>
+                    </div>
+                    <input type="range" id="ai-strength" min="1" max="7" value="4" class="w-full accent-indigo-500 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer">
+                </div>
+            </div>
+
+            <div class="flex flex-col gap-2 pt-2 border-t border-slate-700/50">
+                <button id="hint-btn" class="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white text-sm font-bold rounded-xl shadow-lg shadow-emerald-900/20 transition-all duration-150">
+                    <i data-lucide="lightbulb" class="w-4 h-4"></i> Reveal Strategic Move
+                </button>
+                <button id="reset-btn" class="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-slate-700 hover:bg-slate-600 active:scale-95 text-slate-200 text-sm font-bold rounded-xl border border-slate-600/50 transition-all duration-150">
+                    <i data-lucide="rotate-ccw" class="w-4 h-4"></i> Reset Arena
+                </button>
+            </div>
+        </div>
+
+        <div class="flex flex-col items-center gap-4">
+            <div id="status" class="px-6 py-2.5 bg-slate-800/50 border border-slate-700/40 rounded-full font-bold text-sm text-center shadow-inner tracking-wide min-w-[240px]">
+                Your Turn (Red)
+            </div>
+
+            <div class="bg-indigo-950/90 p-4 sm:p-5 rounded-2xl shadow-2xl shadow-indigo-950/50 border-4 border-indigo-900/80 relative">
+                <div id="board" class="grid grid-cols-7 gap-2 sm:gap-3 cursor-pointer">
+                    </div>
+            </div>
+        </div>
+
+    </div>
+
+    <div id="game-over-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden justify-center items-center p-4 transition-all">
+        <div class="bg-slate-800 border border-slate-700 p-8 rounded-2xl max-w-sm w-full text-center shadow-2xl transform scale-95 transition-transform duration-300">
+            <div class="w-16 h-16 bg-indigo-500/10 text-indigo-400 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i data-lucide="trophy" class="w-8 h-8"></i>
+            </div>
+            <h2 id="winner-text" class="text-2xl font-black text-white mb-6">Red Wins!</h2>
+            <button id="modal-reset" class="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg shadow-indigo-600/30 transition active:scale-98">
+                Rematch Arena
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const ROWS = 6;
+        const COLS = 7;
+        const EMPTY = 0;
+        const PLAYER_RED = 1;
+        const PLAYER_YELLOW = 2;
+
+        let board = [];
+        let currentPlayer = PLAYER_RED; 
+        let userColor = PLAYER_RED;
+        let aiStrength = 4;
+        let gameActive = true;
+        let isVsAI = true;
+        let lastMove = null;
+        let hintCol = null;
+
+        // DOM Elements
+        const boardEl = document.getElementById('board');
+        const statusEl = document.getElementById('status');
+        const resetBtn = document.getElementById('reset-btn');
+        const hintBtn = document.getElementById('hint-btn');
+        const strengthSlider = document.getElementById('ai-strength');
+        const strengthVal = document.getElementById('strength-val');
+        const playRedBtn = document.getElementById('play-red');
+        const playYellowBtn = document.getElementById('play-yellow');
+        const modal = document.getElementById('game-over-modal');
+        const winnerText = document.getElementById('winner-text');
+        const modalReset = document.getElementById('modal-reset');
+        const modeAiBtn = document.getElementById('mode-ai');
+        const modePvpBtn = document.getElementById('mode-pvp');
+        const aiControls = document.getElementById('ai-controls');
+
+        function initGame() {
+            board = Array.from({ length: ROWS }, () => Array(COLS).fill(EMPTY));
+            currentPlayer = PLAYER_RED;
+            gameActive = true;
+            lastMove = null;
+            hintCol = null;
+            modal.classList.replace('flex', 'hidden');
+            renderBoard();
+            updateStatus();
+            
+            if (isVsAI && userColor !== currentPlayer) {
+                setTimeout(makeAiMove, 500);
+            }
+        }
+
+        function renderBoard(isNewMove = false) {
+            boardEl.innerHTML = '';
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    const cell = document.createElement('div');
+                    // Responsive sizing circles
+                    cell.className = 'w-10 h-10 sm:w-14 sm:h-14 bg-slate-900 rounded-full relative cell-inner shadow-inner border border-slate-950/40 overflow-hidden';
+                    
+                    if (board[r][c] === PLAYER_RED) cell.classList.add('cell-red');
+                    if (board[r][c] === PLAYER_YELLOW) cell.classList.add('cell-yellow');
+                    
+                    if (isNewMove && lastMove && r === lastMove.r && c === lastMove.c) {
+                        cell.classList.add('animate-drop');
+                    }
+                    if (hintCol !== null && c === hintCol) {
+                        cell.classList.add('ring-4', 'ring-emerald-500', 'ring-offset-2', 'ring-offset-indigo-950');
+                    }
+                    cell.onclick = () => handleMove(c);
+                    boardEl.appendChild(cell);
+                }
+            }
+        }
+
+        function handleMove(col) {
+            if (!gameActive || (isVsAI && currentPlayer !== userColor)) return;
+            
+            hintCol = null;
+            if (placePiece(col)) {
+                if (checkWin(board, currentPlayer)) {
+                    endGame(currentPlayer === PLAYER_RED ? "Red Wins!" : "Yellow Wins!");
+                    return;
+                }
+                if (board.flat().every(cell => cell !== EMPTY)) {
+                    endGame("It's a Draw!");
+                    return;
+                }
+                
+                currentPlayer = (currentPlayer === PLAYER_RED) ? PLAYER_YELLOW : PLAYER_RED;
+                updateStatus();
+                
+                if (isVsAI && gameActive) {
+                    setTimeout(makeAiMove, 500);
+                }
+            }
+        }
+
+        function placePiece(col) {
+            for (let r = ROWS - 1; r >= 0; r--) {
+                if (board[r][col] === EMPTY) {
+                    board[r][col] = currentPlayer;
+                    lastMove = { r, c: col };
+                    renderBoard(true);
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        function makeAiMove() {
+            if (!gameActive) return;
+            
+            const aiColor = userColor === PLAYER_RED ? PLAYER_YELLOW : PLAYER_RED;
+            const move = getBestMove(board, aiStrength, aiColor);
+            
+            if (move !== null) {
+                placePiece(move);
+                if (checkWin(board, aiColor)) {
+                    endGame(aiColor === PLAYER_RED ? "Red Wins!" : "Yellow Wins!");
+                } else if (board.flat().every(cell => cell !== EMPTY)) {
+                    endGame("It's a Draw!");
+                } else {
+                    currentPlayer = userColor;
+                    updateStatus();
+                }
+            }
+        }
+
+        function updateStatus() {
+            const turnText = currentPlayer === PLAYER_RED ? "Red" : "Yellow";
+            const colorClass = currentPlayer === PLAYER_RED ? "text-red-400" : "text-yellow-400";
+            
+            if (isVsAI) {
+                statusEl.innerHTML = currentPlayer === userColor ? `Your Turn (<span class="${colorClass}">${turnText}</span>)` : `<span class="text-indigo-400">AI is thinking...</span>`;
+            } else {
+                statusEl.innerHTML = `<span class="${colorClass}">${turnText}'s Turn</span>`;
+            }
+        }
+
+        function endGame(msg) {
+            gameActive = false;
+            winnerText.innerText = msg;
+            modal.classList.replace('hidden', 'flex');
+        }
+
+        function showHint() {
+            if (!gameActive || (isVsAI && currentPlayer !== userColor)) return;
+            const move = getBestMove(board, 7, userColor);
+            hintCol = move;
+            renderBoard();
+        }
+
+        // --- AI ENGINE (Minimax with Alpha-Beta Pruning) ---
+        function getBestMove(currentBoard, depth, aiColor) {
+            let bestScore = -Infinity;
+            let move = null;
+            const opponent = aiColor === PLAYER_RED ? PLAYER_YELLOW : PLAYER_RED;
+            const validMoves = getValidMoves(currentBoard);
+            
+            for (let col of validMoves) {
+                let tempBoard = currentBoard.map(row => [...row]);
+                dropPiece(tempBoard, col, aiColor);
+                let score = minimax(tempBoard, depth - 1, -Infinity, Infinity, false, aiColor, opponent);
+                
+                if (score > bestScore) {
+                    bestScore = score;
+                    move = col;
+                }
+            }
+            return move;
+        }
+
+        function minimax(b, depth, alpha, beta, maximizing, aiColor, oppColor) {
+            const isWinAi = checkWin(b, aiColor);
+            const isWinOpp = checkWin(b, oppColor);
+            if (isWinAi) return 100000 + depth;
+            if (isWinOpp) return -100000 - depth;
+            if (depth === 0 || b.flat().every(c => c !== EMPTY)) return evaluateBoard(b, aiColor);
+
+            const validMoves = getValidMoves(b);
+
+            if (maximizing) {
+                let maxEval = -Infinity;
+                for (let col of validMoves) {
+                    let nextBoard = b.map(row => [...row]);
+                    dropPiece(nextBoard, col, aiColor);
+                    let ev = minimax(nextBoard, depth - 1, alpha, beta, false, aiColor, oppColor);
+                    maxEval = Math.max(maxEval, ev);
+                    alpha = Math.max(alpha, ev);
+                    if (beta <= alpha) break;
+                }
+                return maxEval;
+            } else {
+                let minEval = Infinity;
+                for (let col of validMoves) {
+                    let nextBoard = b.map(row => [...row]);
+                    dropPiece(nextBoard, col, oppColor);
+                    let ev = minimax(nextBoard, depth - 1, alpha, beta, true, aiColor, oppColor);
+                    minEval = Math.min(minEval, ev);
+                    beta = Math.min(beta, ev);
+                    if (beta <= alpha) break;
+                }
+                return minEval;
+            }
+        }
+
+        function evaluateBoard(b, color) {
+            let score = 0;
+            const oppColor = color === PLAYER_RED ? PLAYER_YELLOW : PLAYER_RED;
+            const centerCol = Math.floor(COLS / 2);
+            const centerArr = b.map(row => row[centerCol]);
+            const centerCount = centerArr.filter(c => c === color).length;
+            score += centerCount * 3;
+
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS - 3; c++) {
+                    score += evaluateWindow([b[r][c], b[r][c+1], b[r][c+2], b[r][c+3]], color, oppColor);
+                }
+            }
+            for (let c = 0; c < COLS; c++) {
+                for (let r = 0; r < ROWS - 3; r++) {
+                    score += evaluateWindow([b[r][c], b[r+1][c], b[r+2][c], b[r+3][c]], color, oppColor);
+                }
+            }
+            for (let r = 0; r < ROWS - 3; r++) {
+                for (let c = 0; c < COLS - 3; c++) {
+                    score += evaluateWindow([b[r][c], b[r+1][c+1], b[r+2][c+2], b[r+3][c+3]], color, oppColor);
+                }
+            }
+            for (let r = 0; r < ROWS - 3; r++) {
+                for (let c = 0; c < COLS - 3; c++) {
+                    score += evaluateWindow([b[r+3][c], b[r+2][c+1], b[r+1][c+2], b[r][c+3]], color, oppColor);
+                }
+            }
+            return score;
+        }
+
+        function evaluateWindow(window, color, oppColor) {
+            let score = 0;
+            const countColor = window.filter(c => c === color).length;
+            const countEmpty = window.filter(c => c === EMPTY).length;
+            const countOpp = window.filter(c => c === oppColor).length;
+
+            if (countColor === 3 && countEmpty === 1) score += 5;
+            else if (countColor === 2 && countEmpty === 2) score += 2;
+            if (countOpp === 3 && countEmpty === 1) score -= 4;
+
+            return score;
+        }
+
+        function getValidMoves(b) {
+            const moves = [];
+            const order = [3, 2, 4, 1, 5, 0, 6];
+            for (let c of order) {
+                if (b[0][c] === EMPTY) moves.push(c);
+            }
+            return moves;
+        }
+
+        function dropPiece(b, col, color) {
+            for (let r = ROWS - 1; r >= 0; r--) {
+                if (b[r][col] === EMPTY) {
+                    b[r][col] = color;
+                    return;
+                }
+            }
+        }
+
+        function checkWin(b, color) {
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS - 3; c++) {
+                    if (b[r][c] === color && b[r][c+1] === color && b[r][c+2] === color && b[r][c+3] === color) return true;
+                }
+            }
+            for (let c = 0; c < COLS; c++) {
+                for (let r = 0; r < ROWS - 3; r++) {
+                    if (b[r][c] === color && b[r+1][c] === color && b[r+2][c] === color && b[r+3][c] === color) return true;
+                }
+            }
+            for (let r = 0; r < ROWS - 3; r++) {
+                for (let c = 0; c < COLS - 3; c++) {
+                    if (b[r][c] === color && b[r+1][c+1] === color && b[r+2][c+2] === color && b[r+3][c+3] === color) return true;
+                }
+            }
+            for (let r = 3; r < ROWS; r++) {
+                for (let c = 0; c < COLS - 3; c++) {
+                    if (b[r][c] === color && b[r-1][c+1] === color && b[r-2][c+2] === color && b[r-3][c+3] === color) return true;
+                }
+            }
+            return false;
+        }
+
+        // Action Updates and Event Listeners
+        strengthSlider.addEventListener('input', (e) => {
+            aiStrength = parseInt(e.target.value);
+            strengthVal.innerText = aiStrength;
+        });
+
+        playRedBtn.onclick = () => {
+            userColor = PLAYER_RED;
+            playRedBtn.className = "flex items-center justify-center gap-2 py-2 px-3 border-2 border-indigo-500 bg-indigo-500/10 text-red-400 rounded-xl text-sm font-bold shadow-sm transition";
+            playYellowBtn.className = "flex items-center justify-center gap-2 py-2 px-3 border border-slate-700 hover:border-slate-600 text-slate-400 hover:text-slate-200 rounded-xl text-sm font-bold transition";
+            initGame();
+        };
+
+        playYellowBtn.onclick = () => {
+            userColor = PLAYER_YELLOW;
+            playYellowBtn.className = "flex items-center justify-center gap-2 py-2 px-3 border-2 border-indigo-500 bg-indigo-500/10 text-yellow-400 rounded-xl text-sm font-bold shadow-sm transition";
+            playRedBtn.className = "flex items-center justify-center gap-2 py-2 px-3 border border-slate-700 hover:border-slate-600 text-slate-400 hover:text-slate-200 rounded-xl text-sm font-bold transition";
+            initGame();
+        };
+
+        modeAiBtn.onclick = () => {
+            isVsAI = true;
+            modeAiBtn.className = "flex-1 flex items-center justify-center gap-2 py-2 px-3 text-sm font-semibold rounded-lg bg-indigo-600 text-white shadow transition-all duration-200";
+            modePvpBtn.className = "flex-1 flex items-center justify-center gap-2 py-2 px-3 text-sm font-semibold text-slate-400 rounded-lg hover:text-slate-200 transition-all duration-200";
+            aiControls.style.display = 'block';
+            initGame();
+        };
+
+        modePvpBtn.onclick = () => {
+            isVsAI = false;
+            modePvpBtn.className = "flex-1 flex items-center justify-center gap-2 py-2 px-3 text-sm font-semibold rounded-lg bg-indigo-600 text-white shadow transition-all duration-200";
+            modeAiBtn.className = "flex-1 flex items-center justify-center gap-2 py-2 px-3 text-sm font-semibold text-slate-400 rounded-lg hover:text-slate-200 transition-all duration-200";
+            aiControls.style.display = 'none';
+            initGame();
+        };
+
+        resetBtn.onclick = initGame;
+        hintBtn.onclick = showHint;
+        modalReset.onclick = initGame;
+
+        initGame();
+        // Initialize Lucide icons
+        lucide.createIcons();
+    </script>
+</body>
+</html>
