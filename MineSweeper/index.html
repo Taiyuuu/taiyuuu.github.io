@@ -1,0 +1,2618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minesweeper</title>
+    <style>
+        :root {
+            --bg-color: #bdbdbd;
+            --border-light: #ffffff;
+            --border-dark: #7b7b7b;
+            --tile-size: 80px;
+        }
+
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            background-color: #4a4a4a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        #game-container {
+            background-color: var(--bg-color);
+            padding: 10px;
+            border: 3px outset var(--border-light);
+            user-select: none;
+        }
+
+        /* Header Styling */
+        #header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: var(--bg-color);
+            border: 3px inset var(--border-light);
+            padding: 5px 10px;
+            margin-bottom: 10px;
+        }
+
+        .lcd-display {
+            background-color: black;
+            color: red;
+            font-size: 24px;
+            padding: 2px 5px;
+            min-width: 50px;
+            text-align: right;
+        }
+
+        #face-btn {
+            width: 30px;
+            height: 30px;
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border: 2px outset var(--border-light);
+        }
+
+        #face-btn img {
+            width: 30px;
+            height: 30px;
+        }
+
+        .center-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        #keep-btn, #draw-btn {
+            height: 30px;
+            font-family: 'Courier New', Courier, monospace;
+            font-weight: bold;
+            cursor: pointer;
+            background-color: var(--bg-color);
+            border: 2px outset var(--border-light);
+            padding: 0 10px;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        #keep-btn:active, #draw-btn:active {
+            border-style: inset;
+        }
+
+        /* Grid Styling */
+        #grid {
+            border: 3px inset var(--border-light);
+            display: grid;
+            background-color: var(--border-dark);
+        }
+
+        .tile {
+            width: var(--tile-size);
+            height: var(--tile-size);
+            box-sizing: border-box;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            font-size: calc(var(--tile-size) * 0.64);
+            cursor: pointer;
+            position: relative;
+        }
+
+        .tile.hidden {
+            /* Remove the old outset border */
+            border: none; 
+            background-color: var(--bg-color);
+        }
+
+        .tile.revealed {
+            /* Keep a thin flat border for the grid effect */
+            border: 1px solid var(--border-dark);
+            background-color: var(--bg-color);
+        }
+
+        .tile img {
+            width: 100%;
+            height: 100%;
+            display: block;
+            /* This ensures the SVG doesn't get blurry or distorted */
+            image-rendering: pixelated; 
+            object-fit: fill; 
+        }
+
+        .tile.empty {
+            visibility: hidden;
+            cursor: default;
+        }
+
+        /* Level Selector */
+        #controls {
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        /* Number Colors */
+        .n1 { color: blue; } .n2 { color: green; } .n3 { color: red; }
+        .n4 { color: darkblue; } .n5 { color: darkred; } .n6 { color: teal; }
+        .n7 { color: black; } .n8 { color: gray; }
+
+        .tile::after {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.4);
+            pointer-events: none;
+            display: none;
+        }
+
+        .tile:hover::after, .tile.highlight::after {
+            display: block;
+        }
+        
+        .tile.hint-safe::after {
+            display: block;
+            background-color: rgba(0, 255, 0, 0.5);
+        }
+        .tile.hint-mine::after {
+            display: block;
+            background-color: rgba(255, 0, 0, 0.5);
+        }
+        .tile.cleared-row::after {
+            display: block;
+            background-color: rgba(0, 255, 0, 0.3);
+        }
+
+        .particle {
+            position: fixed;
+            width: calc(var(--tile-size) * 0.4);
+            height: calc(var(--tile-size) * 0.4);
+            pointer-events: none;
+            z-index: 9999;
+        }
+
+        #board-resizer {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 10px;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+        }
+        #board-resizer label {
+            color: white;
+            font-family: sans-serif;
+            font-size: 12px;
+        }
+
+        #custom-modal {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+        }
+        #custom-modal.hidden { display: none; }
+
+        #challenge-modal {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+        }
+        #challenge-modal.hidden { display: none; }
+
+        #settings-modal {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+        }
+        #settings-modal.hidden { display: none; }
+
+        #settings-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 10px;
+            font-family: 'Courier New', Courier, monospace;
+            font-weight: bold;
+            cursor: pointer;
+            background-color: var(--bg-color);
+            border: 3px outset var(--border-light);
+        }
+        #settings-btn:active {
+            border-style: inset;
+        }
+
+        .modal-content {
+            background-color: var(--bg-color);
+            padding: 20px;
+            border: 3px outset var(--border-light);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            font-family: 'Courier New', Courier, monospace;
+        }
+        .modal-content h3 { margin: 0 0 10px 0; text-align: center; }
+        .modal-content label { display: flex; justify-content: space-between; gap: 10px; }
+        .modal-content input { width: 60px; }
+        .modal-btns { display: flex; justify-content: center; gap: 10px; margin-top: 10px; }
+
+        @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            10% { transform: translate(-1px, -2px) rotate(-1deg); }
+            20% { transform: translate(-3px, 0px) rotate(1deg); }
+            30% { transform: translate(3px, 2px) rotate(0deg); }
+            40% { transform: translate(1px, -1px) rotate(1deg); }
+            50% { transform: translate(-1px, 2px) rotate(-1deg); }
+            60% { transform: translate(-3px, 1px) rotate(0deg); }
+            70% { transform: translate(3px, 1px) rotate(-1deg); }
+            80% { transform: translate(-1px, -1px) rotate(1deg); }
+            90% { transform: translate(1px, 2px) rotate(0deg); }
+            100% { transform: translate(1px, -2px) rotate(-1deg); }
+        }
+        .shake { animation: shake 0.5s; animation-iteration-count: 1; }
+
+        @keyframes mineReveal {
+            0% { transform: scale(1.8); opacity: 0.5; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .mine-anim { animation: mineReveal 0.3s ease-out forwards; position: relative; z-index: 10; }
+
+        .center-hole {
+            background-color: var(--bg-color);
+            border: 3px inset var(--border-light);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: calc(var(--tile-size) * 1.5);
+            z-index: 5;
+        }
+
+        .challenge-btn {
+            display: block;
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0;
+            cursor: pointer;
+        }
+
+        .tile .explosion-gif {
+            width: 400%;
+            height: 400%;
+            transform: translateY(-30%);
+            position: relative;
+            z-index: 100;
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div id="controls">
+        <button onclick="startGame('classic')">Classic</button>
+        <button onclick="startGame('beginner')">Easy</button>
+        <button onclick="startGame('intermediate')">Medium</button>
+        <button onclick="startGame('expert')">Expert</button>
+        <button onclick="showChallengeModal()">Challenge</button>
+        <button onclick="showCustomModal()">Custom</button>
+    </div>
+
+    <div id="header">
+        <div id="mine-count" class="lcd-display">000</div>
+        <div class="center-controls">
+            <button id="draw-btn" onclick="toggleDrawMode()">Draw</button>
+            <div id="face-btn">😊</div>
+            <button id="keep-btn" onclick="keepGame()">Keep</button>
+        </div>
+        <div id="timer" class="lcd-display">000</div>
+    </div>
+
+    <div id="grid"></div>
+</div>
+
+<div id="board-resizer">
+    <label for="size-slider">Zoom</label>
+    <input type="range" id="size-slider" min="10" max="100" value="80" oninput="updateBoardSize(this.value)">
+    <label><input type="checkbox" id="ai-check" onchange="toggleAI()"> AI</label>
+    <button onclick="showHint()">Hint</button>
+    <button onclick="analyzeBoard()">Analysis</button>
+    <label><input type="checkbox" id="xray-check" onchange="toggleXray()"> X-ray</label>
+</div>
+
+<button id="settings-btn" onclick="showSettingsModal()">Settings...</button>
+
+<div id="settings-modal" class="hidden">
+    <div class="modal-content">
+        <h3>Settings</h3>
+        <label><input type="checkbox" id="spaced-mines-check"> Spaced Mines</label>
+        <label><input type="checkbox" id="auto-reveal-check" checked> Auto Reveal</label>
+        <label><input type="checkbox" id="explosion-sound-check" checked> Explosion Sound</label>
+        <hr style="width: 100%; border: 1px solid var(--border-dark);">
+        <label>Left Click Alternative Key: <button id="btn-set-left" onclick="startKeyBinding('left')" style="width: 60px;">A</button></label>
+        <label>Right Click Alternative Key: <button id="btn-set-right" onclick="startKeyBinding('right')" style="width: 60px;">F</button></label>
+        <hr style="width: 100%; border: 1px solid var(--border-dark);">
+        <label for="texture-select">Texture Pack</label>
+        <select id="texture-select" onchange="changeTexturePack(this.value)">
+            <option value="system">System Text</option>
+            <option value="texture_default">Default</option>
+            <option value="custom">Custom Folder...</option>
+        </select>
+        <input type="file" id="folder-input" webkitdirectory directory style="display: none;" onchange="loadCustomTexturePack(this)">
+        <div class="modal-btns">
+            <button onclick="closeSettingsModal()">Close</button>
+        </div>
+    </div>
+</div>
+
+<div id="custom-modal" class="hidden">
+    <div class="modal-content">
+        <h3>Custom Level</h3>
+        <label>Mode: <select id="custom-mode-select">
+            <option value="standard">Standard</option>
+            <option value="cursed_multi_mine">Not a single mine</option>
+        </select></label>
+        <label>Rows: <input type="number" id="custom-rows" value="20" min="5" max="50"></label>
+        <label>Cols: <input type="number" id="custom-cols" value="30" min="5" max="50"></label>
+        <label>Mines: <input type="number" id="custom-mines" value="100" min="1"></label>
+        <div class="modal-btns">
+            <button onclick="startCustomGame()">Start</button>
+            <button onclick="startDrawMode()">Draw</button>
+            <button onclick="closeCustomModal()">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<div id="challenge-modal" class="hidden">
+    <div class="modal-content" style="width: 300px;">
+        <h3>Select Challenge</h3>
+        <button class="challenge-btn" onclick="startChallenge('flags')">🚩 Flags</button>
+        <button class="challenge-btn" onclick="startChallenge('detonation')">💣 Detonation</button>
+        <button class="challenge-btn" onclick="startChallenge('treasure')">💎 Treasure Hunt</button>
+        <button class="challenge-btn" onclick="startChallenge('taps')">👆 Taps</button>
+        <button class="challenge-btn" onclick="startChallenge('falling')">🧱 Falling</button>
+        <div style="margin-top: 10px; border-top: 1px solid white; padding-top: 10px; text-align: center;">
+            <label style="font-size: 14px; color: white;">Goal (Mines): <input type="number" id="falling-goal" value="0" min="0" style="width: 50px;"></label>
+        </div>
+        <button class="challenge-btn" onclick="closeChallengeModal()">Cancel</button>
+    </div>
+</div>
+
+<script>
+    // Config: Replace these strings with your .svg file paths
+    const IMAGES = {
+        default: '<img src="images/texture_default/default.svg">', 
+        flag: '<img src="images/texture_default/flag.svg">',
+        question: '<img src="images/texture_default/question_mark.svg">',
+        blank: '<img src="images/texture_default/blank.svg">',
+        mine_revealed: '<img src="images/texture_default/mine_revealed.png" class="mine-anim">',
+        explosion: '<img src="images/explosion.gif">', // Kept in images/
+        smile: '<img src="images/texture_default/smile.png">',
+        dead: '<img src="images/texture_default/dead.png">',
+        double_flag: '', triple_flag: '',
+        double_mine: '', triple_mine: ''
+    };
+
+    const SOUNDS = {
+        blank: new Audio('sounds/blank_reveal.mp3'),
+        n1: new Audio('sounds/1.mp3'),
+        n2: new Audio('sounds/2.mp3'),
+        n3: new Audio('sounds/3.mp3'),
+        n4: new Audio('sounds/4.mp3'),
+        n5: new Audio('sounds/5.mp3'),
+        n6: new Audio('sounds/6.mp3'),
+        n7: new Audio('sounds/7.mp3'),
+        n8: new Audio('sounds/8.mp3'),
+        flag_on: new Audio('sounds/flag_on.mp3'),
+        flag_off: new Audio('sounds/flag_off.mp3'),
+        win: new Audio('sounds/win.mp3'),
+        main_explosion: new Audio('sounds/explosion.mp3'),
+        explosions: Array.from({length: 6}, (_, i) => new Audio(`sounds/e${i+1}.mp3`))
+    };
+
+    const LEVELS = {
+        classic: { rows: 8, cols: 8, mines: 10 },
+        beginner: { rows: 9, cols: 9, mines: 10 },
+        intermediate: { rows: 16, cols: 16, mines: 40 },
+        expert: { rows: 16, cols: 30, mines: 99 }
+    };
+
+    const CHALLENGES = {
+        flags: {
+            rows: 16, cols: 16, mines: 37,
+            hole: { r: 6, c: 6, w: 4, h: 4, icon: '🚩' },
+            timeLimit: 180,
+            goal: 10 // 10 correct flags
+        },
+        detonation: {
+            rows: 12, cols: 12, mines: 27,
+            hole: { r: 4, c: 4, w: 4, h: 4, icon: '💣' },
+            moves: 18,
+            goal: 15 // 15 detonations
+        },
+        treasure: {
+            rows: 16, cols: 30, mines: 75,
+            hole: { r: 6, c: 13, w: 4, h: 4, icon: '💰' },
+            hp: 4
+        },
+        taps: {
+            rows: 16, cols: 16, mines: 37,
+            hole: { r: 6, c: 6, w: 4, h: 4, icon: '👆' },
+            goal: 10, // 10 safe reveals
+            maxMines: 1
+        },
+        falling: {
+            rows: 15, cols: 10, mines: 0, // mines is dynamic
+            speed: 5000, // ms
+            goal: 0 // set by input
+        }
+    };
+
+    let gameMode = 'standard'; // 'standard' or challenge key
+    let config = { ...LEVELS.beginner };
+    let grid = [];
+    let mineLocations = [];
+    let gameOver = false;
+    let timerInterval = null;
+    let time = 0;
+    let flagsPlaced = 0;
+    let minesPlaced = false;
+    let pendingSoundPriority = 0;
+    let soundTimeout = null;
+    let explosionTimeouts = [];
+    let smokeIntervals = [];
+    let allowSkip = false;
+    let skipTimeout = null;
+    let challengeState = {};
+    let hoveredTile = null;
+    let keysPressed = new Set();
+    let activeTexturePack = 'system';
+    let keyLeftClick = 'a';
+    let keyRightClick = 'f';
+    let bindingKey = null;
+    let aiTimer = null;
+    let fallingInterval = null;
+    let pendingHint = null;
+
+    const gridEl = document.getElementById('grid');
+    const timerEl = document.getElementById('timer');
+    const mineEl = document.getElementById('mine-count');
+    const faceBtn = document.getElementById('face-btn');
+
+    function startGame(level) {
+        gameMode = 'standard';
+        config = { ...LEVELS[level] };
+        resetGame();
+    }
+
+    function keepGame() {
+        if (gameMode !== 'standard') {
+            resetGame();
+            return;
+        }
+
+        let oldMines = [];
+        for (let r = 0; r < config.rows; r++) {
+            for (let c = 0; c < config.cols; c++) {
+                if (grid[r][c] && grid[r][c].isMine) {
+                    oldMines.push({r, c});
+                }
+            }
+        }
+
+        if (oldMines.length === 0) {
+            resetGame();
+            return;
+        }
+
+        resetGame();
+
+        oldMines.forEach(pos => {
+            if (grid[pos.r][pos.c]) {
+                grid[pos.r][pos.c].isMine = true;
+            }
+        });
+
+        minesPlaced = true;
+        calculateNeighbors();
+    }
+
+    function resetGame() {
+        if (gameMode === 'draw') {
+            gameMode = 'standard';
+            config = { ...LEVELS.beginner };
+        }
+
+        if (gameMode === 'cursed_multi_mine') {
+            changeTexturePack('cursed_1');
+        } else if (activeTexturePack === 'cursed_1') {
+            changeTexturePack('system');
+        }
+
+        const drawBtn = document.getElementById('draw-btn');
+        if (drawBtn) drawBtn.textContent = "Draw";
+
+        clearInterval(timerInterval);
+        explosionTimeouts.forEach(t => clearTimeout(t));
+        explosionTimeouts = [];
+        smokeIntervals.forEach(i => clearInterval(i));
+        smokeIntervals = [];
+        clearTimeout(skipTimeout);
+        clearInterval(fallingInterval);
+        fallingInterval = null;
+        clearHints();
+        allowSkip = false;
+        timerInterval = null;
+        time = 0;
+        gameOver = false;
+        flagsPlaced = 0;
+        minesPlaced = false;
+        timerEl.textContent = "000";
+        faceBtn.innerHTML = IMAGES.smile;
+        if (config.baseMines) config.mines = config.baseMines;
+        
+        if (gameMode !== 'standard') {
+            initChallengeState();
+        } else {
+            mineEl.textContent = config.mines.toString().padStart(3, '0');
+        }
+
+        gridEl.style.gridTemplateColumns = `repeat(${config.cols}, var(--tile-size))`;
+        gridEl.innerHTML = '';
+        
+        createGrid();
+
+        if (gameMode !== 'standard' && gameMode !== 'treasure') {
+            // Pre-setup for challenges
+            placeMines(-1, -1); // Random placement, no safe start guarantee needed for pre-revealed
+            calculateNeighbors();
+            minesPlaced = true;
+            setupChallengeBoard();
+            if (CHALLENGES[gameMode].timeLimit) {
+                startTimer();
+            }
+        }
+    }
+
+    function createGrid() {
+        grid = [];
+        for (let r = 0; r < config.rows; r++) {
+            grid[r] = [];
+            for (let c = 0; c < config.cols; c++) {
+                // Check for hole
+                if (config.hole && 
+                    r >= config.hole.r && r < config.hole.r + config.hole.h &&
+                    c >= config.hole.c && c < config.hole.c + config.hole.w) {
+                    grid[r][c] = null;
+                    continue;
+                }
+                // For falling mode, we might init as empty, but createGrid makes standard tiles.
+
+                const tile = {
+                    r, c,
+                    isMine: false,
+                    mineCount: 0,
+                    revealed: false,
+                    flagged: 0, // 0: none, 1: flag, 2: question
+                    neighborMines: 0,
+                    active: true, // For falling mode
+                    isCleared: false,
+                    el: document.createElement('div')
+                };
+                tile.el.classList.add('tile', 'hidden');
+                tile.el.addEventListener('click', () => clickTile(r, c));
+                tile.el.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    rightClickTile(r, c);
+                });
+                tile.el.addEventListener('mousedown', (e) => handleChord(e, r, c));
+                tile.el.addEventListener('mouseup', () => clearHighlights());
+                tile.el.addEventListener('mouseenter', () => { 
+                    hoveredTile = { r, c }; 
+                    if (document.getElementById('xray-check')?.checked) updateTileVisuals(tile);
+                });
+                tile.el.addEventListener('mouseleave', () => {
+                    if (hoveredTile && hoveredTile.r === r && hoveredTile.c === c) {
+                        hoveredTile = null;
+                    }
+                    clearHighlights();
+                    updateTileVisuals(tile);
+                });
+                updateTileVisuals(tile);
+                gridEl.appendChild(tile.el);
+                grid[r][c] = tile;
+            }
+        }
+
+        if (config.hole) {
+            const holeEl = document.createElement('div');
+            holeEl.className = 'center-hole';
+            holeEl.textContent = config.hole.icon;
+            // Grid lines are 1-based
+            holeEl.style.gridRow = `${config.hole.r + 1} / span ${config.hole.h}`;
+            holeEl.style.gridColumn = `${config.hole.c + 1} / span ${config.hole.w}`;
+            gridEl.appendChild(holeEl);
+        }
+    }
+
+    function placeMines(excludeR, excludeC) {
+        const spacedMines = document.getElementById('spaced-mines-check').checked;
+        let safeSpots = [];
+        let neighborSpots = [];
+        
+        // For challenges, we might not have an exclude zone if pre-generating
+        const useExclude = excludeR !== -1;
+
+        // Count existing mines
+        let currentMines = 0;
+        for (let r = 0; r < config.rows; r++) {
+            for (let c = 0; c < config.cols; c++) {
+                if (grid[r][c] && grid[r][c].isMine) currentMines++;
+            }
+        }
+
+        for (let r = 0; r < config.rows; r++) {
+            for (let c = 0; c < config.cols; c++) {
+                if (!grid[r][c]) continue; // Skip hole
+                if (grid[r][c].isMine) continue; // Skip existing mines
+                if (gameMode === 'treasure' && challengeState.treasure && grid[r][c] === challengeState.treasure) continue; // Skip treasure
+
+                if (r === excludeR && c === excludeC) continue;
+                
+                if (useExclude && Math.abs(r - excludeR) <= 1 && Math.abs(c - excludeC) <= 1) {
+                    neighborSpots.push({r, c});
+                } else {
+                    safeSpots.push({r, c});
+                }
+            }
+        }
+
+        safeSpots.sort(() => Math.random() - 0.5);
+        neighborSpots.sort(() => Math.random() - 0.5);
+
+        let minesNeeded = config.mines - currentMines;
+        const allSpots = [...safeSpots, ...neighborSpots];
+        
+        let targetMines = config.mines;
+        if (gameMode === 'cursed_multi_mine' && config.baseMines) targetMines = config.baseMines;
+        minesNeeded = targetMines - currentMines;
+
+        // First pass: Try to place mines with spacing if enabled
+        if (spacedMines && gameMode === 'standard') {
+            for (let i = 0; i < allSpots.length && minesNeeded > 0; i++) {
+                const r = allSpots[i].r;
+                const c = allSpots[i].c;
+                
+                let tooClose = false;
+                for (let dr = -1; dr <= 1; dr++) {
+                    for (let dc = -1; dc <= 1; dc++) {
+                        if (dr === 0 && dc === 0) continue;
+                        const nr = r + dr;
+                        const nc = c + dc;
+                        if (nr >= 0 && nr < config.rows && nc >= 0 && nc < config.cols && grid[nr][nc] && grid[nr][nc].isMine) {
+                            tooClose = true;
+                            break;
+                        }
+                    }
+                    if (tooClose) break;
+                }
+                
+                if (!tooClose) {
+                    grid[r][c].isMine = true;
+                    minesNeeded--;
+                }
+            }
+        }
+
+        for (let i = 0; i < allSpots.length && minesNeeded > 0; i++) {
+            const r = allSpots[i].r;
+            const c = allSpots[i].c;
+
+            if (grid[r][c].isMine) continue;
+
+            if (gameMode === 'treasure') {
+                let tooClose = false;
+                for (let dr = -1; dr <= 1; dr++) {
+                    for (let dc = -1; dc <= 1; dc++) {
+                        if (dr === 0 && dc === 0) continue;
+                        const nr = r + dr;
+                        const nc = c + dc;
+                        if (nr >= 0 && nr < config.rows && nc >= 0 && nc < config.cols && grid[nr][nc] && grid[nr][nc].isMine) {
+                            tooClose = true;
+                            break;
+                        }
+                    }
+                    if (tooClose) break;
+                }
+                if (tooClose) continue;
+            }
+
+            if (gameMode === 'standard') {
+                // Prevent lines of 4 or more
+                let hCount = 0;
+                for (let k = 1; k <= 3; k++) {
+                    if (c - k >= 0 && grid[r][c - k].isMine) hCount++;
+                    else break;
+                }
+                for (let k = 1; k <= 3; k++) {
+                    if (c + k < config.cols && grid[r][c + k].isMine) hCount++;
+                    else break;
+                }
+                if (hCount >= 3) continue;
+
+                let vCount = 0;
+                for (let k = 1; k <= 3; k++) {
+                    if (r - k >= 0 && grid[r - k][c].isMine) vCount++;
+                    else break;
+                }
+                for (let k = 1; k <= 3; k++) {
+                    if (r + k < config.rows && grid[r + k][c].isMine) vCount++;
+                    else break;
+                }
+                if (vCount >= 3) continue;
+            }
+
+            grid[r][c].isMine = true;
+            minesNeeded--;
+        }
+
+        // Fallback: if we couldn't place all mines due to constraints (e.g. high density), place them anywhere
+        if (minesNeeded > 0 && gameMode === 'standard') {
+            for (let i = 0; i < allSpots.length && minesNeeded > 0; i++) {
+                const r = allSpots[i].r;
+                const c = allSpots[i].c;
+                if (!grid[r][c].isMine) {
+                    grid[r][c].isMine = true;
+                    minesNeeded--;
+                }
+            }
+        }
+
+        if (gameMode === 'cursed_multi_mine') {
+            let totalWeight = 0;
+            for (let r = 0; r < config.rows; r++) {
+                for (let c = 0; c < config.cols; c++) {
+                    if (grid[r][c].isMine) {
+                        grid[r][c].mineCount = Math.floor(Math.random() * 2) + 2;
+                        totalWeight += grid[r][c].mineCount;
+                    }
+                }
+            }
+            // Update config.mines to reflect total weight for the counter
+            config.mines = totalWeight;
+        }
+    }
+
+    function calculateNeighbors() {
+        for (let r = 0; r < config.rows; r++) {
+            for (let c = 0; c < config.cols; c++) {
+                if (!grid[r][c]) continue;
+                if (gameMode === 'falling' && !grid[r][c].active) continue;
+                if (grid[r][c].isMine) continue;
+                let count = 0;
+                traverseNeighbors(r, c, (nr, nc) => {
+                    if (grid[nr][nc].isMine) {
+                        count += (grid[nr][nc].mineCount || 1);
+                    }
+                });
+                grid[r][c].neighborMines = count;
+            }
+        }
+    }
+
+    function traverseNeighbors(r, c, callback) {
+        for (let dr = -1; dr <= 1; dr++) {
+            for (let dc = -1; dc <= 1; dc++) {
+                if (dr === 0 && dc === 0) continue;
+                let nr = r + dr;
+                let nc = c + dc;
+                if (nr >= 0 && nr < config.rows && nc >= 0 && nc < config.cols && grid[nr][nc] && (gameMode !== 'falling' || grid[nr][nc].active)) {
+                    callback(nr, nc);
+                }
+            }
+        }
+    }
+
+    function startTimer() {
+        if (timerInterval) return;
+        if (gameMode === 'detonation' || gameMode === 'treasure') return;
+
+        timerInterval = setInterval(() => {
+            if (gameMode !== 'standard' && CHALLENGES[gameMode].timeLimit) {
+                time--;
+                timerEl.textContent = time.toString().padStart(3, '0');
+                if (time <= 0) {
+                    endGame(false);
+                }
+            } else {
+                time++;
+                timerEl.textContent = time.toString().padStart(3, '0');
+                if (time >= 999) clearInterval(timerInterval);
+            }
+        }, 1000);
+    }
+
+    function clickTile(r, c, fromChord = false) {
+        // Flags mode: cannot reveal tiles
+        if (gameMode === 'flags') return;
+
+        if (gameMode === 'draw') {
+            let tile = grid[r][c];
+            if (!tile.isMine) {
+                tile.isMine = true;
+                updateTileVisuals(tile);
+                updateDrawCount();
+            }
+            return;
+        }
+
+        clearHints();
+
+        if (gameOver) {
+            if (allowSkip && explosionTimeouts.length > 0) {
+                explosionTimeouts.forEach(t => clearTimeout(t));
+                explosionTimeouts = [];
+                for (let r = 0; r < config.rows; r++) {
+                    for (let c = 0; c < config.cols; c++) {
+                        let tile = grid[r][c];
+                        if (tile && tile.isMine && !tile.revealed) {
+                            tile.el.classList.remove('hidden');
+                            tile.el.classList.add('revealed');
+                            tile.el.innerHTML = IMAGES.mine_revealed;
+                            createParticles(tile.el.getBoundingClientRect());
+                            startSmoking(tile.el);
+                        }
+                    }
+                }
+            }
+            return;
+        }
+        let tile = grid[r][c];
+        if (gameMode === 'falling' && !tile.active) return;
+        if (tile.revealed || (fromChord ? tile.flagged === 1 : tile.flagged !== 0)) return;
+
+        if (gameMode === 'falling' && challengeState.firstClick) {
+            challengeState.firstClick = false;
+            let minesRemoved = 0;
+            // Ensure clicked tile is safe
+            if (grid[r][c].isMine) {
+                grid[r][c].isMine = false;
+                minesRemoved++;
+            }
+            // Ensure neighbors are safe (create blank area)
+            traverseNeighbors(r, c, (nr, nc) => {
+                if (grid[nr][nc].isMine) {
+                    grid[nr][nc].isMine = false;
+                    minesRemoved++;
+                }
+            });
+            challengeState.totalMines -= minesRemoved;
+            challengeState.minesGenerated -= minesRemoved;
+            calculateNeighbors();
+            for(let rr=0; rr<config.rows; rr++) {
+                for(let cc=0; cc<config.cols; cc++) {
+                    if(grid[rr][cc].active) updateTileVisuals(grid[rr][cc]);
+                }
+            }
+            updateChallengeUI();
+        }
+
+        if (!minesPlaced) {
+            if (gameMode === 'treasure') {
+                setupChallengeBoard(r, c);
+                placeMines(r, c);
+                calculateNeighbors();
+                minesPlaced = true;
+                triggerShake();
+            } else {
+                placeMines(r, c);
+                calculateNeighbors();
+                minesPlaced = true;
+                triggerShake();
+                if (gameMode !== 'standard') {
+                    setupChallengeBoard(r, c);
+                }
+                if (gameMode === 'cursed_multi_mine') {
+                    mineEl.textContent = (config.mines - flagsPlaced).toString().padStart(3, '0');
+                }
+            }
+        }
+
+        startTimer();
+
+        if (tile.isMine) {
+            if (gameMode === 'detonation') {
+                // Detonation mode: clicking mines is good
+                if (!tile.revealed) {
+                    tile.revealed = true;
+                    tile.el.classList.remove('hidden');
+                    tile.el.classList.add('revealed');
+                    triggerExplosion(tile);
+                    createParticles(tile.el.getBoundingClientRect());
+                    if (document.getElementById('explosion-sound-check').checked) {
+                        SOUNDS.main_explosion.cloneNode(true).play().catch(() => {});
+                    }
+                    
+                    challengeState.detonated++;
+                    challengeState.moves--;
+                    updateChallengeUI();
+                    
+                    if (challengeState.detonated >= CHALLENGES.detonation.goal) {
+                        endGame(true);
+                    } else {
+                        const needed = CHALLENGES.detonation.goal - challengeState.detonated;
+                        if (challengeState.moves < needed) endGame(false);
+                    }
+                }
+            } else if (gameMode === 'treasure') {
+                // Treasure mode: lose HP
+                tile.revealed = true;
+                challengeState.detonated++;
+                challengeState.hp--;
+                updateChallengeUI();
+                triggerShake();
+                createParticles(tile.el.getBoundingClientRect());
+                if (document.getElementById('explosion-sound-check').checked) {
+                    SOUNDS.main_explosion.cloneNode(true).play().catch(() => {});
+                }
+                triggerExplosion(tile);
+                tile.el.classList.remove('hidden');
+                tile.el.classList.add('revealed');
+                if (challengeState.hp <= 0) endGame(false, tile);
+            } else if (gameMode === 'taps') {
+                tile.revealed = true;
+                challengeState.minesClicked++;
+                if (challengeState.minesClicked > CHALLENGES.taps.maxMines) {
+                    endGame(false, tile);
+                } else {
+                    triggerExplosion(tile);
+                    tile.el.classList.remove('hidden');
+                    tile.el.classList.add('revealed');
+                }
+            } else {
+                endGame(false, tile);
+            }
+            return;
+        }
+
+        revealTile(r, c);
+        
+        if (gameMode === 'detonation') {
+            challengeState.moves--;
+            updateChallengeUI();
+            const needed = CHALLENGES.detonation.goal - challengeState.detonated;
+            if (challengeState.moves < needed) endGame(false);
+        } else if (gameMode === 'taps') {
+            challengeState.safeRevealed++;
+            updateChallengeUI();
+            if (challengeState.safeRevealed >= CHALLENGES.taps.goal) endGame(true);
+        } else if (gameMode === 'falling') {
+            // Check for line clears
+            checkLineClears();
+            checkWin();
+        } else if (gameMode === 'treasure') {
+            if (r === challengeState.treasure.r && c === challengeState.treasure.c) {
+                tile.el.innerHTML = '💰'; // Treasure found
+                endGame(true);
+            }
+        } else {
+            checkWin();
+        }
+    }
+
+    function queueSound(priority) {
+        if (gameOver) return;
+        pendingSoundPriority = Math.max(pendingSoundPriority, priority);
+        if (!soundTimeout) {
+            soundTimeout = setTimeout(playQueuedSound, 10);
+        }
+    }
+
+    function playQueuedSound() {
+        if (pendingSoundPriority === 9) {
+            SOUNDS.blank.currentTime = 0; SOUNDS.blank.play().catch(() => {});
+        } else if (pendingSoundPriority >= 1 && pendingSoundPriority <= 8) {
+            SOUNDS[`n${pendingSoundPriority}`].currentTime = 0; SOUNDS[`n${pendingSoundPriority}`].play().catch(() => {});
+        }
+        pendingSoundPriority = 0;
+        soundTimeout = null;
+    }
+
+    function revealTile(r, c) {
+        let tile = grid[r][c];
+        if (tile.revealed || tile.flagged === 1) return;
+
+        tile.revealed = true;
+        tile.el.classList.remove('hidden');
+        tile.el.classList.add('revealed');
+        updateTileVisuals(tile);
+        createParticles(tile.el.getBoundingClientRect(), 4);
+
+        if (tile.neighborMines > 0) {
+            queueSound(tile.neighborMines);
+        } else {
+            // If blank, reveal neighbors
+            traverseNeighbors(r, c, (nr, nc) => revealTile(nr, nc));
+            queueSound(9);
+        }
+    }
+
+    function createParticles(rect, count = 6) {
+        for (let i = 0; i < count; i++) {
+            const p = document.createElement('div');
+            p.className = 'particle';
+            const startX = rect.left + rect.width / 2;
+            const startY = rect.top + rect.height / 2;
+            p.style.left = startX + 'px';
+            p.style.top = startY + 'px';
+            
+            const colors = ['#7b7b7b', '#bdbdbd', '#ffffff'];
+            p.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+
+            document.body.appendChild(p);
+
+            const angle = Math.random() * Math.PI * 2;
+            const dist = Math.random() * rect.width + (rect.width * 0.4);
+            const x = Math.cos(angle) * dist;
+            const y = Math.sin(angle) * dist;
+
+            p.animate([
+                { transform: 'translate(-50%, -50%) scale(1)', opacity: 1 },
+                { transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px)) scale(0)`, opacity: 0 }
+            ], {
+                duration: 900 + Math.random() * 600,
+                easing: 'ease-out'
+            }).onfinish = () => p.remove();
+        }
+    }
+
+    function startSmoking(el) {
+        const id = setInterval(() => {
+            createParticles(el.getBoundingClientRect(), 2);
+        }, 800 + Math.random() * 400);
+        smokeIntervals.push(id);
+    }
+
+    function triggerExplosion(tile) {
+        tile.el.style.zIndex = 100;
+        tile.el.innerHTML = `<img src="images/explosion.gif?t=${Date.now()}" class="explosion-gif">`;
+        setTimeout(() => {
+            tile.el.style.zIndex = '';
+            if (tile.el.innerHTML.includes('explosion.gif')) {
+                tile.el.innerHTML = IMAGES.mine_revealed;
+            }
+        }, 1700);
+    }
+
+    function rightClickTile(r, c) {
+        if (gameMode === 'draw') {
+            let tile = grid[r][c];
+            if (tile.isMine) {
+                tile.isMine = false;
+                updateTileVisuals(tile);
+                updateDrawCount();
+            }
+            return;
+        }
+
+        if (gameOver || grid[r][c].revealed) return;
+        if (gameMode === 'taps' || gameMode === 'detonation') return; // No flags in these modes
+        startTimer();
+        clearHints();
+        
+        let tile = grid[r][c];
+        if (gameMode === 'falling' && !tile.active) return;
+        const oldFlagState = tile.flagged;
+        
+        if (gameMode === 'cursed_multi_mine') {
+            // 0 -> 2(double) -> 3(triple) -> 4(question) -> 0
+            if (tile.flagged === 0) tile.flagged = 2;
+            else if (tile.flagged === 2) tile.flagged = 3;
+            else if (tile.flagged === 3) tile.flagged = 4;
+            else tile.flagged = 0;
+        } else {
+            tile.flagged = (tile.flagged + 1) % 3;
+        }
+        
+        const newFlagState = tile.flagged;
+
+        // Handle global flagsPlaced counter and sounds
+        // Calculate weight change
+        let oldWeight = 0;
+        if (oldFlagState === 1) oldWeight = 1;
+        else if (oldFlagState === 2 && gameMode === 'cursed_multi_mine') oldWeight = 2;
+        else if (oldFlagState === 3 && gameMode === 'cursed_multi_mine') oldWeight = 3;
+
+        let newWeight = 0;
+        if (newFlagState === 1) newWeight = 1;
+        else if (newFlagState === 2 && gameMode === 'cursed_multi_mine') newWeight = 2;
+        else if (newFlagState === 3 && gameMode === 'cursed_multi_mine') newWeight = 3;
+
+        flagsPlaced = flagsPlaced - oldWeight + newWeight;
+
+        if (newWeight > oldWeight) {
+            updateTileVisuals(tile);
+            SOUNDS.flag_on.currentTime = 0; SOUNDS.flag_on.play().catch(() => {});
+        } else {
+            // Flag removed or reduced (or to question)
+            if (newFlagState === 2 && gameMode !== 'cursed_multi_mine') { // Question mark in standard
+                updateTileVisuals(tile);
+                SOUNDS.flag_off.currentTime = 0; SOUNDS.flag_off.play().catch(() => {});
+            } else if (newFlagState === 4 && gameMode === 'cursed_multi_mine') { // Question mark in cursed
+                updateTileVisuals(tile);
+                SOUNDS.flag_off.currentTime = 0; SOUNDS.flag_off.play().catch(() => {});
+            } else { // Now blank
+                updateTileVisuals(tile);
+            }
+        }
+        
+        if (gameMode === 'flags') {
+            const flagAdded = oldFlagState !== 1 && newFlagState === 1;
+            const flagRemoved = oldFlagState === 1 && newFlagState !== 1;
+
+            if (flagAdded) {
+                challengeState.flagsPlacedByUser++;
+                if (tile.isMine) challengeState.correctFlagsByUser++;
+            } else if (flagRemoved) {
+                challengeState.flagsPlacedByUser--;
+                if (tile.isMine) challengeState.correctFlagsByUser--;
+            }
+            
+            updateChallengeUI();
+
+            if (challengeState.flagsPlacedByUser === CHALLENGES.flags.goal) {
+                if (challengeState.correctFlagsByUser === CHALLENGES.flags.goal) {
+                    endGame(true);
+                } else {
+                    endGame(false);
+                }
+            }
+        } else if (gameMode === 'treasure') {
+            updateChallengeUI();
+        } else if (gameMode === 'falling') {
+            // Check for line clears
+            checkLineClears();
+            updateChallengeUI();
+            checkWin();
+        } else if (gameMode === 'standard') {
+            mineEl.textContent = (config.mines - flagsPlaced).toString().padStart(3, '0');
+
+            if (document.getElementById('auto-reveal-check').checked && (config.mines - flagsPlaced) === 0) {
+                let targets = [];
+                for (let r = 0; r < config.rows; r++) {
+                    for (let c = 0; c < config.cols; c++) {
+                        if (!grid[r][c].revealed && grid[r][c].flagged !== 1) {
+                            targets.push({r, c});
+                        }
+                    }
+                }
+                for (let t of targets) {
+                    if (gameOver) break;
+                    clickTile(t.r, t.c);
+                }
+            }
+        }
+    }
+
+    function handleChord(e, r, c) {
+        if (gameOver) return;
+        if (e.buttons === 3) {
+            triggerChord(r, c);
+        }
+    }
+
+    function triggerChord(r, c) {
+        let tile = grid[r][c];
+        if (tile.revealed && tile.neighborMines > 0) {
+            let flagCount = 0;
+            traverseNeighbors(r, c, (nr, nc) => {
+                if (gameMode === 'cursed_multi_mine') {
+                    // Count flags weight
+                    if (grid[nr][nc].flagged >= 1 && grid[nr][nc].flagged <= 3) flagCount += grid[nr][nc].flagged;
+                    else if (grid[nr][nc].revealed && grid[nr][nc].isMine) flagCount += grid[nr][nc].mineCount;
+                } else {
+                    if (grid[nr][nc].flagged === 1 || (grid[nr][nc].revealed && grid[nr][nc].isMine)) flagCount++;
+                }
+            });
+
+            if (flagCount === tile.neighborMines) {
+                traverseNeighbors(r, c, (nr, nc) => {
+                    if (!grid[nr][nc].revealed && grid[nr][nc].flagged !== 1) {
+                        clickTile(nr, nc, true);
+                    }
+                });
+            } else {
+                highlightNeighbors(r, c);
+            }
+        }
+    }
+
+    function highlightNeighbors(r, c) {
+        traverseNeighbors(r, c, (nr, nc) => {
+            let neighbor = grid[nr][nc];
+            let isFlagged = neighbor.flagged === 1;
+            if (gameMode === 'cursed_multi_mine') {
+                isFlagged = neighbor.flagged >= 1 && neighbor.flagged <= 3;
+            }
+            if (!neighbor.revealed && !isFlagged) {
+                neighbor.el.classList.add('highlight');
+            }
+        });
+    }
+
+    function clearHighlights() {
+        document.querySelectorAll('.tile.highlight').forEach(el => el.classList.remove('highlight'));
+    }
+
+    function checkWin() {
+        if (gameMode === 'falling') {
+            if (config.goal > 0 && challengeState.minesCleared >= config.goal) endGame(true);
+            return;
+        }
+        if (gameMode !== 'standard' && gameMode !== 'cursed_multi_mine') return; // Challenges have own win cons
+        let unrevealed = 0;
+        for (let r = 0; r < config.rows; r++) {
+            for (let c = 0; c < config.cols; c++) {
+                if (!grid[r][c]) continue;
+                if (!grid[r][c].isMine && !grid[r][c].revealed) unrevealed++;
+            }
+        }
+        if (unrevealed === 0) endGame(true);
+    }
+
+    function endGame(won, clickedTile) {
+        gameOver = true;
+        clearInterval(timerInterval);
+        faceBtn.innerHTML = won ? '😎' : IMAGES.dead;
+        if (fallingInterval) clearInterval(fallingInterval);
+
+        if (won) {
+            if (gameMode === 'detonation') {
+                setTimeout(() => {
+                    SOUNDS.win.play().catch(() => {});
+                }, 1000);
+            } else {
+                SOUNDS.win.play().catch(() => {});
+            }
+            for (let r = 0; r < config.rows; r++) {
+                for (let c = 0; c < config.cols; c++) {
+                    let tile = grid[r][c];
+                    if (!tile) continue;
+                    if (tile.isMine && (gameMode !== 'falling' || tile.active)) {
+                        tile.revealed = true;
+                        tile.el.classList.remove('hidden');
+                        tile.el.classList.add('revealed');
+                        if (gameMode === 'cursed_multi_mine') {
+                            if (tile.mineCount === 2) tile.el.innerHTML = IMAGES.double_mine;
+                            else if (tile.mineCount === 3) tile.el.innerHTML = IMAGES.triple_mine;
+                            else tile.el.innerHTML = IMAGES.mine_revealed;
+                        } else {
+                            tile.el.innerHTML = IMAGES.mine_revealed;
+                        }
+                    }
+                }
+            }
+        } else {
+            if (clickedTile) {
+                clickedTile.revealed = true;
+                triggerShake();
+                triggerExplosion(clickedTile);
+                clickedTile.el.style.backgroundColor = 'red';
+                if (document.getElementById('explosion-sound-check').checked) {
+                    SOUNDS.main_explosion.cloneNode(true).play().catch(() => {});
+                }
+                createParticles(clickedTile.el.getBoundingClientRect());
+                startSmoking(clickedTile.el);
+            }
+
+            // Allow skipping animation after a short delay
+            skipTimeout = setTimeout(() => { allowSkip = true; }, 200);
+            
+            let mines = [];
+            for (let r = 0; r < config.rows; r++) {
+                for (let c = 0; c < config.cols; c++) {
+                    if (grid[r][c] && grid[r][c].isMine && grid[r][c] !== clickedTile && (gameMode !== 'falling' || grid[r][c].active)) mines.push(grid[r][c]);
+                }
+            }
+            
+            // Shuffle mines
+            mines.sort(() => Math.random() - 0.5);
+            
+            let currentDelay = 0;
+            mines.forEach((tile, i) => {
+                const interval = Math.max(30, 400 * Math.pow(0.97, i));
+                currentDelay += interval;
+
+                explosionTimeouts.push(setTimeout(() => {
+                    tile.revealed = true;
+                    tile.el.classList.remove('hidden');
+                    tile.el.classList.add('revealed');
+                    if (gameMode === 'cursed_multi_mine') {
+                        if (tile.mineCount === 2) tile.el.innerHTML = IMAGES.double_mine;
+                        else if (tile.mineCount === 3) tile.el.innerHTML = IMAGES.triple_mine;
+                        else tile.el.innerHTML = IMAGES.mine_revealed;
+                    } else {
+                        tile.el.innerHTML = IMAGES.mine_revealed;
+                    }
+                    SOUNDS.explosions[i % 6].cloneNode(true).play().catch(() => {});
+                    createParticles(tile.el.getBoundingClientRect());
+                    startSmoking(tile.el);
+                }, currentDelay));
+            });
+        }
+    }
+
+    function updateBoardSize(size) {
+        document.documentElement.style.setProperty('--tile-size', `${size}px`);
+    }
+
+    function showCustomModal() {
+        document.getElementById('custom-modal').classList.remove('hidden');
+    }
+
+    function closeCustomModal() {
+        document.getElementById('custom-modal').classList.add('hidden');
+    }
+
+    function showSettingsModal() {
+        document.getElementById('settings-modal').classList.remove('hidden');
+    }
+
+    function closeSettingsModal() {
+        bindingKey = null;
+        document.getElementById('btn-set-left').textContent = keyLeftClick.toUpperCase();
+        document.getElementById('btn-set-right').textContent = keyRightClick.toUpperCase();
+        document.getElementById('settings-modal').classList.add('hidden');
+    }
+
+    function startCustomGame() {
+        const rows = parseInt(document.getElementById('custom-rows').value);
+        const cols = parseInt(document.getElementById('custom-cols').value);
+        const mines = parseInt(document.getElementById('custom-mines').value);
+        const mode = document.getElementById('custom-mode-select').value;
+
+        if (isNaN(rows) || rows < 2) return alert("Rows must be at least 2");
+        if (isNaN(cols) || cols < 2) return alert("Cols must be at least 2");
+        if (isNaN(mines) || mines < 1) return alert("Mines must be at least 1");
+        if (mines >= rows * cols) return alert("Too many mines!");
+
+        config = { rows, cols, mines };
+        if (mode === 'cursed_multi_mine') {
+            config.baseMines = mines;
+        }
+        gameMode = mode;
+        closeCustomModal();
+        resetGame();
+    }
+
+    function startDrawMode() {
+        const rows = parseInt(document.getElementById('custom-rows').value);
+        const cols = parseInt(document.getElementById('custom-cols').value);
+        
+        if (isNaN(rows) || rows < 2) return alert("Rows must be at least 2");
+        if (isNaN(cols) || cols < 2) return alert("Cols must be at least 2");
+
+        config = { rows, cols, mines: 0 };
+        gameMode = 'draw';
+        closeCustomModal();
+        
+        clearInterval(timerInterval);
+        explosionTimeouts.forEach(t => clearTimeout(t));
+        explosionTimeouts = [];
+        smokeIntervals.forEach(i => clearInterval(i));
+        smokeIntervals = [];
+        clearTimeout(skipTimeout);
+        clearHints();
+        allowSkip = false;
+        timerInterval = null;
+        time = 0;
+        gameOver = false;
+        flagsPlaced = 0;
+        minesPlaced = false;
+        
+        timerEl.textContent = "000";
+        mineEl.textContent = "000";
+        faceBtn.innerHTML = "✏️";
+
+        const drawBtn = document.getElementById('draw-btn');
+        if (drawBtn) drawBtn.textContent = "Play";
+
+        gridEl.style.gridTemplateColumns = `repeat(${config.cols}, var(--tile-size))`;
+        gridEl.innerHTML = '';
+        
+        createGrid();
+        
+        for(let r=0; r<config.rows; r++) {
+            for(let c=0; c<config.cols; c++) {
+                let tile = grid[r][c];
+                tile.revealed = true;
+                tile.el.classList.remove('hidden');
+                tile.el.classList.add('revealed');
+                updateTileVisuals(tile);
+            }
+        }
+    }
+
+    function toggleDrawMode() {
+        const btn = document.getElementById('draw-btn');
+        if (gameMode === 'draw') {
+            finishDrawMode();
+            return;
+        }
+
+        gameMode = 'draw';
+        btn.textContent = "Play";
+        
+        clearInterval(timerInterval);
+        explosionTimeouts.forEach(t => clearTimeout(t));
+        explosionTimeouts = [];
+        smokeIntervals.forEach(i => clearInterval(i));
+        smokeIntervals = [];
+        clearTimeout(skipTimeout);
+        clearHints();
+        allowSkip = false;
+        timerInterval = null;
+        time = 0;
+        gameOver = false;
+        flagsPlaced = 0;
+        minesPlaced = false;
+        
+        timerEl.textContent = "000";
+        faceBtn.innerHTML = "✏️";
+
+        let count = 0;
+        for(let r=0; r<config.rows; r++) {
+            for(let c=0; c<config.cols; c++) {
+                let tile = grid[r][c];
+                if (!tile) continue;
+                tile.flagged = 0;
+                tile.revealed = true;
+                tile.el.classList.remove('hidden');
+                tile.el.classList.add('revealed');
+                if (tile.isMine) count++;
+                updateTileVisuals(tile);
+            }
+        }
+        config.mines = count;
+        mineEl.textContent = count.toString().padStart(3, '0');
+    }
+
+    function finishDrawMode() {
+        let count = 0;
+        for(let r=0; r<config.rows; r++) {
+            for(let c=0; c<config.cols; c++) {
+                if(grid[r][c] && grid[r][c].isMine) count++;
+            }
+        }
+        if(count === 0) return alert("Place at least one mine!");
+        
+        config.mines = count;
+        gameMode = 'standard';
+        minesPlaced = true;
+        calculateNeighbors();
+        
+        for(let r=0; r<config.rows; r++) {
+            for(let c=0; c<config.cols; c++) {
+                let tile = grid[r][c];
+                if (!tile) continue;
+                tile.revealed = false;
+                tile.el.classList.add('hidden');
+                tile.el.classList.remove('revealed');
+                updateTileVisuals(tile);
+            }
+        }
+        
+        faceBtn.innerHTML = IMAGES.smile;
+        mineEl.textContent = config.mines.toString().padStart(3, '0');
+
+        const drawBtn = document.getElementById('draw-btn');
+        if (drawBtn) drawBtn.textContent = "Draw";
+    }
+
+    function updateDrawCount() {
+        let count = 0;
+        for(let r=0; r<config.rows; r++) {
+            for(let c=0; c<config.cols; c++) {
+                if(grid[r][c] && grid[r][c].isMine) count++;
+            }
+        }
+        mineEl.textContent = count.toString().padStart(3, '0');
+    }
+
+    function startKeyBinding(type) {
+        bindingKey = type;
+        const btn = document.getElementById(type === 'left' ? 'btn-set-left' : 'btn-set-right');
+        btn.textContent = '...';
+    }
+
+    function triggerShake() {
+        const container = document.getElementById('game-container');
+        container.classList.remove('shake');
+        void container.offsetWidth; // Trigger reflow to restart animation
+        container.classList.add('shake');
+    }
+
+    // Challenge Mode Logic
+    function showChallengeModal() {
+        document.getElementById('challenge-modal').classList.remove('hidden');
+    }
+    function closeChallengeModal() {
+        document.getElementById('challenge-modal').classList.add('hidden');
+    }
+    function startChallenge(mode) {
+        gameMode = mode;
+        if (mode === 'falling') {
+            const goal = parseInt(document.getElementById('falling-goal').value) || 0;
+            CHALLENGES.falling.goal = goal;
+        }
+        config = { ...CHALLENGES[mode] };
+        closeChallengeModal();
+        resetGame();
+    }
+
+    function initChallengeState() {
+        challengeState = {
+            detonated: 0,
+            flagsPlacedByUser: 0,
+            correctFlagsByUser: 0,
+            moves: CHALLENGES[gameMode].moves || 0,
+            hp: CHALLENGES[gameMode].hp || 0,
+            safeRevealed: 0,
+            minesClicked: 0,
+            treasure: null,
+            minesCleared: 0, // For falling mode
+            totalMines: 0,
+            minesGenerated: 0,
+            firstClick: true
+        };
+        time = CHALLENGES[gameMode].timeLimit || 0;
+        updateChallengeUI();
+    }
+
+    function setupChallengeBoard(clickR = -1, clickC = -1) {
+        // Pre-reveal logic based on mode
+        let safeTiles = [];
+        let mineTiles = [];
+        for (let r = 0; r < config.rows; r++) {
+            for (let c = 0; c < config.cols; c++) {
+                if (!grid[r][c]) continue;
+                if (grid[r][c].isMine) mineTiles.push(grid[r][c]);
+                else safeTiles.push(grid[r][c]);
+            }
+        }
+
+        if (gameMode === 'flags') {
+            // Reveal 30% safe, Flag 20% mines (some correctly)
+            safeTiles.sort(() => Math.random() - 0.5);
+            safeTiles.slice(0, Math.floor(safeTiles.length * 0.3)).forEach(t => revealTile(t.r, t.c));
+            
+            mineTiles.sort(() => Math.random() - 0.5);
+            mineTiles.slice(0, Math.floor(mineTiles.length * 0.2)).forEach(t => {
+                t.flagged = 1;
+                t.el.innerHTML = IMAGES.flag;
+                flagsPlaced++;
+            });
+            updateChallengeUI();
+        } else if (gameMode === 'detonation') {
+            // Reveal 35% safe
+            safeTiles.sort(() => Math.random() - 0.5);
+            safeTiles.slice(0, Math.floor(safeTiles.length * 0.35)).forEach(t => revealTile(t.r, t.c));
+        } else if (gameMode === 'treasure') {
+            // Pick treasure location: not on edge, far from start
+            let candidates = [];
+            for (let r = 1; r < config.rows - 1; r++) {
+                for (let c = 1; c < config.cols - 1; c++) {
+                    if (!grid[r][c]) continue;
+                    if (clickR !== -1 && Math.abs(r - clickR) <= 2 && Math.abs(c - clickC) <= 2) continue;
+                    candidates.push(grid[r][c]);
+                }
+            }
+            
+            if (candidates.length > 0) {
+                const t = candidates[Math.floor(Math.random() * candidates.length)];
+                challengeState.treasure = t;
+                t.isMine = false; // Ensure treasure is safe
+                
+                // Surround with mines
+                for (let dr = -1; dr <= 1; dr++) {
+                    for (let dc = -1; dc <= 1; dc++) {
+                        if (dr === 0 && dc === 0) continue;
+                        let nr = t.r + dr;
+                        let nc = t.c + dc;
+                        if (grid[nr][nc]) grid[nr][nc].isMine = true;
+                    }
+                }
+                calculateNeighbors(); // Update numbers
+            }
+        } else if (gameMode === 'taps') {
+            // Reveal 20% safe tiles
+            safeTiles.sort(() => Math.random() - 0.5);
+            safeTiles.slice(0, Math.floor(safeTiles.length * 0.2)).forEach(t => revealTile(t.r, t.c));
+        } else if (gameMode === 'falling') {
+            // Initialize falling board
+            setupFallingBoard();
+            // Start falling timer
+            fallingInterval = setInterval(fallingTick, config.speed);
+        }
+    }
+
+    function updateChallengeUI() {
+        if (gameMode === 'flags') {
+            // Left: Remaining flags needed
+            let remaining = Math.max(0, CHALLENGES.flags.goal - challengeState.flagsPlacedByUser);
+            mineEl.textContent = remaining.toString().padStart(3, '0');
+            timerEl.textContent = time.toString().padStart(3, '0');
+        } else if (gameMode === 'detonation') {
+            // Left: Remaining to detonate
+            let remaining = Math.max(0, CHALLENGES.detonation.goal - challengeState.detonated);
+            mineEl.textContent = remaining.toString().padStart(3, '0');
+            timerEl.textContent = challengeState.moves.toString().padStart(3, '0');
+        } else if (gameMode === 'treasure') {
+            // Left: Mines (standard), Right: HP
+            mineEl.textContent = (config.mines - flagsPlaced - challengeState.detonated).toString().padStart(3, '0');
+            let hearts = '';
+            for(let i=0; i<challengeState.hp; i++) hearts += '❤️';
+            timerEl.textContent = hearts.padEnd(3, ' '); // Hacky fit
+            // Better: just number
+            timerEl.innerHTML = '❤️' + challengeState.hp;
+        } else if (gameMode === 'taps') {
+            // Left: Remaining taps needed
+            let remaining = Math.max(0, CHALLENGES.taps.goal - challengeState.safeRevealed);
+            mineEl.textContent = remaining.toString().padStart(3, '0');
+            timerEl.textContent = time.toString().padStart(3, '0');
+        } else if (gameMode === 'falling') {
+            let val = Math.max(0, challengeState.totalMines - flagsPlaced);
+            mineEl.textContent = val.toString().padStart(3, '0');
+            if (config.goal > 0) {
+                let val = Math.max(0, config.goal - challengeState.minesCleared);
+                mineEl.textContent = val.toString().padStart(3, '0');
+            } else {
+                let val = Math.max(0, challengeState.totalMines - flagsPlaced);
+                mineEl.textContent = val.toString().padStart(3, '0');
+            }
+            timerEl.textContent = time.toString().padStart(3, '0');
+        }
+    }
+
+    // Falling Mode Functions
+    function setupFallingBoard() {
+        // Set all to inactive initially
+        for(let r=0; r<config.rows; r++) {
+            for(let c=0; c<config.cols; c++) {
+                grid[r][c].active = false;
+                updateTileVisuals(grid[r][c]);
+            }
+        }
+        // Add 3 initial rows
+        for(let i=0; i<3; i++) {
+            addNewRow(i);
+        }
+        calculateNeighbors();
+    }
+
+    function addNewRow(rIndex) {
+        let minesAdded = 0;
+        let minesAllowed = Infinity;
+
+        if (config.goal > 0) {
+            minesAllowed = Math.max(0, config.goal - challengeState.totalMines);
+            minesAllowed = Math.max(0, config.goal - challengeState.minesGenerated);
+        }
+
+        // rIndex is usually 0 (top), but during setup we fill 0,1,2
+        // We need to populate grid[rIndex] with active tiles
+        for(let c=0; c<config.cols; c++) {
+            let tile = grid[rIndex][c];
+            tile.active = true;
+            
+            let isMine = false;
+            if (minesAdded < minesAllowed) {
+                isMine = Math.random() < 0.2; // 20% mine density
+            }
+            tile.isMine = isMine;
+            if (tile.isMine) minesAdded++;
+            
+            tile.revealed = false;
+            tile.flagged = 0;
+            tile.neighborMines = 0;
+            tile.isCleared = false;
+        }
+
+        if (minesAdded === 0 && minesAllowed > 0) {
+            const c = Math.floor(Math.random() * config.cols);
+            if (!grid[rIndex][c].isMine) {
+                grid[rIndex][c].isMine = true;
+                minesAdded++;
+            }
+        }
+
+        for(let c=0; c<config.cols; c++) {
+            updateTileVisuals(grid[rIndex][c]);
+        }
+
+        if (challengeState) challengeState.totalMines += minesAdded;
+        if (challengeState) {
+            challengeState.totalMines += minesAdded;
+            challengeState.minesGenerated += minesAdded;
+        }
+    }
+
+    function fallingTick() {
+        if (gameOver) return;
+
+        // Check bottom row
+        for(let c=0; c<config.cols; c++) {
+            if (grid[config.rows-1][c].active) {
+                endGame(false); // Hit bottom
+                return;
+            }
+        }
+
+        // Shift down
+        // We move data from r to r+1.
+        // Iterate from bottom-1 to 0
+        for(let r=config.rows-2; r>=0; r--) {
+            for(let c=0; c<config.cols; c++) {
+                let src = grid[r][c];
+                let dst = grid[r+1][c];
+                
+                dst.active = src.active;
+                dst.isMine = src.isMine;
+                dst.revealed = src.revealed;
+                dst.flagged = src.flagged;
+                dst.isCleared = src.isCleared;
+                // neighborMines will be recalculated
+            }
+        }
+
+        // Add new top row
+        addNewRow(0);
+
+        // Update visuals and numbers
+        calculateNeighbors();
+        for(let r=0; r<config.rows; r++) {
+            for(let c=0; c<config.cols; c++) {
+                updateTileVisuals(grid[r][c]);
+            }
+        }
+    }
+
+    function checkLineClears() {
+        let changes = false;
+        for(let r=0; r<config.rows; r++) {
+            let isFull = true;
+            let isSolved = true;
+            let minesInRow = 0;
+            let fullyCleared = true;
+
+            for(let c=0; c<config.cols; c++) {
+                let t = grid[r][c];
+                if (!t.active) {
+                    isFull = false;
+                    break;
+                }
+                if (t.isMine) minesInRow++;
+                
+                // Solved if: Mine is flagged OR Safe is revealed
+                if (t.isMine && t.flagged !== 1) isSolved = false;
+                if (!t.isMine && !t.revealed) isSolved = false;
+                
+                if (!t.isCleared) fullyCleared = false;
+            }
+
+            if (isFull && isSolved && !fullyCleared) {
+                // Mark row as cleared but do not delete
+                challengeState.minesCleared += minesInRow;
+                for(let c=0; c<config.cols; c++) {
+                    grid[r][c].isCleared = true;
+                }
+                changes = true;
+            }
+        }
+
+        if (changes) {
+            for(let r=0; r<config.rows; r++) {
+                for(let c=0; c<config.cols; c++) {
+                    updateTileVisuals(grid[r][c]);
+                }
+            }
+            updateChallengeUI();
+        }
+    }
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && gameMode === 'draw') {
+            finishDrawMode();
+            return;
+        }
+
+        if (bindingKey) {
+            e.preventDefault();
+            const key = e.key.toLowerCase();
+            if (bindingKey === 'left') {
+                keyLeftClick = key;
+                document.getElementById('btn-set-left').textContent = key.toUpperCase();
+            } else if (bindingKey === 'right') {
+                keyRightClick = key;
+                document.getElementById('btn-set-right').textContent = key.toUpperCase();
+            }
+            bindingKey = null;
+            return;
+        }
+
+        if (e.key.toLowerCase() === 'z' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+            e.preventDefault();
+            const slider = document.getElementById('size-slider');
+            let val = parseInt(slider.value);
+            if (e.shiftKey) {
+                val = Math.max(parseInt(slider.min), val - 5);
+            } else {
+                val = Math.min(parseInt(slider.max), val + 5);
+            }
+            slider.value = val;
+            updateBoardSize(val);
+            return;
+        }
+
+        if (e.key.toLowerCase() === 'h') {
+            showHint();
+            return;
+        }
+
+        if (e.repeat) return;
+        const key = e.key.toLowerCase();
+        keysPressed.add(key);
+
+        if (!hoveredTile || gameOver) return;
+        
+        if (keysPressed.has(keyLeftClick) && keysPressed.has(keyRightClick)) {
+            triggerChord(hoveredTile.r, hoveredTile.c);
+        } else if (key === keyLeftClick) {
+            clickTile(hoveredTile.r, hoveredTile.c);
+        } else if (key === keyRightClick) {
+            rightClickTile(hoveredTile.r, hoveredTile.c);
+        }
+    });
+
+    document.addEventListener('keyup', (e) => {
+        const key = e.key.toLowerCase();
+        keysPressed.delete(key);
+        if (key === keyLeftClick || key === keyRightClick) {
+            clearHighlights();
+        }
+    });
+
+    function toggleAI() {
+        const checkbox = document.getElementById('ai-check');
+        if (checkbox.checked) {
+            if (!aiTimer) aiTimer = setInterval(runAIStep, 100);
+        } else {
+            if (aiTimer) {
+                clearInterval(aiTimer);
+                aiTimer = null;
+            }
+        }
+    }
+
+    function toggleXray() {
+        for(let r=0; r<config.rows; r++) {
+            for(let c=0; c<config.cols; c++) {
+                if(grid[r][c]) updateTileVisuals(grid[r][c]);
+            }
+        }
+    }
+
+    function runAIStep() {
+        if (gameOver || gameMode !== 'standard') return;
+
+        // Check if board is empty
+        let hasRevealed = false;
+        for(let r=0; r<config.rows; r++) {
+            for(let c=0; c<config.cols; c++) {
+                if(grid[r][c] && grid[r][c].revealed) {
+                    hasRevealed = true;
+                    break;
+                }
+            }
+            if(hasRevealed) break;
+        }
+
+        if (!hasRevealed) {
+            const r = Math.floor(config.rows / 2);
+            const c = Math.floor(config.cols / 2);
+            if (grid[r][c]) clickTile(r, c);
+            return;
+        }
+
+        // 1. Flagging Step
+        for (let r = 0; r < config.rows; r++) {
+            for (let c = 0; c < config.cols; c++) {
+                let tile = grid[r][c];
+                if (!tile || !tile.revealed || tile.neighborMines === 0) continue;
+
+                let unrevealed = [];
+                let flags = 0;
+                
+                traverseNeighbors(r, c, (nr, nc) => {
+                    let n = grid[nr][nc];
+                    if (n.flagged === 1) flags++;
+                    else if (!n.revealed) unrevealed.push(n);
+                });
+
+                if (unrevealed.length > 0 && unrevealed.length === tile.neighborMines - flags) {
+                    let target = unrevealed[0];
+                    if (target.flagged !== 1) {
+                        rightClickTile(target.r, target.c);
+                        return; 
+                    }
+                }
+            }
+        }
+
+        // 2. Revealing Step
+        for (let r = 0; r < config.rows; r++) {
+            for (let c = 0; c < config.cols; c++) {
+                let tile = grid[r][c];
+                if (!tile || !tile.revealed || tile.neighborMines === 0) continue;
+
+                let flags = 0;
+                let hasUnrevealed = false;
+                
+                traverseNeighbors(r, c, (nr, nc) => {
+                    let n = grid[nr][nc];
+                    if (n.flagged === 1) flags++;
+                    else if (!n.revealed) hasUnrevealed = true;
+                });
+
+                if (hasUnrevealed && flags === tile.neighborMines) {
+                    triggerChord(r, c);
+                    return;
+                }
+            }
+        }
+
+        // 3. Advanced Pattern Step (Subset Rule & 1-2 Pattern)
+        let activeTiles = [];
+        for(let r=0; r<config.rows; r++) {
+            for(let c=0; c<config.cols; c++) {
+                let t = grid[r][c];
+                if(t && t.revealed && t.neighborMines > 0) {
+                    let unrevealed = [];
+                    let flags = 0;
+                    traverseNeighbors(r, c, (nr, nc) => {
+                        let n = grid[nr][nc];
+                        if(n.flagged === 1) flags++;
+                        else if(!n.revealed) unrevealed.push(n);
+                    });
+                    
+                    if(unrevealed.length > 0) {
+                        activeTiles.push({
+                            r: r, c: c,
+                            eff: t.neighborMines - flags,
+                            unrevealed: unrevealed
+                        });
+                    }
+                }
+            }
+        }
+
+        for(let i=0; i<activeTiles.length; i++) {
+            let A = activeTiles[i];
+            for(let j=i+1; j<activeTiles.length; j++) {
+                let B = activeTiles[j];
+                
+                if(Math.abs(A.r - B.r) > 1 || Math.abs(A.c - B.c) > 1) continue;
+
+                let U_A = A.unrevealed.filter(a => !B.unrevealed.includes(a));
+                let U_B = B.unrevealed.filter(b => !A.unrevealed.includes(b));
+                
+                let diff = A.eff - B.eff;
+                
+                if (diff === U_A.length) {
+                    let acted = false;
+                    U_A.forEach(n => {
+                                if(n.flagged !== 1) {
+                                    rightClickTile(n.r, n.c);
+                                    acted = true;
+                                }
+                            });
+                    U_B.forEach(n => {
+                                if(!n.revealed && n.flagged !== 1) {
+                                    clickTile(n.r, n.c);
+                                    acted = true;
+                                }
+                            });
+                    if (acted) return;
+                }
+                
+                if (-diff === U_B.length) {
+                    let acted = false;
+                    U_B.forEach(n => {
+                        if(n.flagged !== 1) {
+                            rightClickTile(n.r, n.c);
+                            acted = true;
+                        }
+                    });
+                    U_A.forEach(n => {
+                        if(!n.revealed && n.flagged !== 1) {
+                            clickTile(n.r, n.c);
+                            acted = true;
+                        }
+                    });
+                    if (acted) return;
+                }
+            }
+        }
+    }
+
+    function showHint() {
+        if (gameOver) return;
+        
+        if (pendingHint) {
+            pendingHint.forEach(h => {
+                if (h.type === 'flag') {
+                    if (grid[h.r][h.c].flagged !== 1) rightClickTile(h.r, h.c);
+                } else if (h.type === 'reveal') {
+                    if (!grid[h.r][h.c].revealed && grid[h.r][h.c].flagged !== 1) clickTile(h.r, h.c);
+                }
+            });
+            pendingHint = null;
+            clearHints();
+            return;
+        }
+
+        clearHints();
+
+        // 1. Flagging Step (Guaranteed Mines)
+        for (let r = 0; r < config.rows; r++) {
+            for (let c = 0; c < config.cols; c++) {
+                let tile = grid[r][c];
+                if (!tile || !tile.revealed || tile.neighborMines === 0) continue;
+
+                let unrevealed = [];
+                let flags = 0;
+                
+                traverseNeighbors(r, c, (nr, nc) => {
+                    let n = grid[nr][nc];
+                    if (n.flagged === 1) flags++;
+                    else if (!n.revealed) unrevealed.push(n);
+                });
+
+                if (unrevealed.length > 0 && unrevealed.length === tile.neighborMines - flags) {
+                    let target = unrevealed[0];
+                    if (target.flagged !== 1) {
+                        target.el.classList.add('hint-mine');
+                        pendingHint = [{r: target.r, c: target.c, type: 'flag'}];
+                        setTimeout(() => { 
+                            target.el.classList.remove('hint-mine'); 
+                            pendingHint = null;
+                        }, 2000);
+                        return; 
+                    }
+                }
+            }
+        }
+
+        // 2. Revealing Step (Guaranteed Safe)
+        for (let r = 0; r < config.rows; r++) {
+            for (let c = 0; c < config.cols; c++) {
+                let tile = grid[r][c];
+                if (!tile || !tile.revealed || tile.neighborMines === 0) continue;
+
+                let flags = 0;
+                let unrevealed = [];
+                
+                traverseNeighbors(r, c, (nr, nc) => {
+                    let n = grid[nr][nc];
+                    if (n.flagged === 1) flags++;
+                    else if (!n.revealed) unrevealed.push(n);
+                });
+
+                if (unrevealed.length > 0 && flags === tile.neighborMines) {
+                    let target = unrevealed[0];
+                    target.el.classList.add('hint-safe');
+                    pendingHint = [{r: target.r, c: target.c, type: 'reveal'}];
+                    setTimeout(() => { 
+                        target.el.classList.remove('hint-safe'); 
+                        pendingHint = null;
+                    }, 2000);
+                    return;
+                }
+            }
+        }
+
+        // 3. Advanced Pattern Step (Subset Rule & 1-2 Pattern)
+        let activeTiles = [];
+        for(let r=0; r<config.rows; r++) {
+            for(let c=0; c<config.cols; c++) {
+                let t = grid[r][c];
+                if(t && t.revealed && t.neighborMines > 0) {
+                    let unrevealed = [];
+                    let flags = 0;
+                    traverseNeighbors(r, c, (nr, nc) => {
+                        let n = grid[nr][nc];
+                        if(n.flagged === 1) flags++;
+                        else if(!n.revealed) unrevealed.push(n);
+                    });
+                    
+                    if(unrevealed.length > 0) {
+                        activeTiles.push({
+                            r: r, c: c,
+                            eff: t.neighborMines - flags,
+                            unrevealed: unrevealed
+                        });
+                    }
+                }
+            }
+        }
+
+        for(let i=0; i<activeTiles.length; i++) {
+            let A = activeTiles[i];
+            for(let j=i+1; j<activeTiles.length; j++) {
+                let B = activeTiles[j];
+                
+                if(Math.abs(A.r - B.r) > 1 || Math.abs(A.c - B.c) > 1) continue;
+
+                let U_A = A.unrevealed.filter(a => !B.unrevealed.includes(a));
+                let U_B = B.unrevealed.filter(b => !A.unrevealed.includes(b));
+                
+                let diff = A.eff - B.eff;
+                
+                if (diff === U_A.length) {
+                    let hints = [];
+                    for(let n of U_A) {
+                        if(n.flagged !== 1) {
+                            n.el.classList.add('hint-mine');
+                            hints.push({r: n.r, c: n.c, type: 'flag'});
+                        }
+                    }
+                    for(let n of U_B) {
+                        if(!n.revealed && n.flagged !== 1) {
+                            n.el.classList.add('hint-safe');
+                            hints.push({r: n.r, c: n.c, type: 'reveal'});
+                        }
+                    }
+                    if (hints.length > 0) {
+                        pendingHint = hints;
+                        setTimeout(() => {
+                            hints.forEach(h => {
+                                if(grid[h.r][h.c]) {
+                                    grid[h.r][h.c].el.classList.remove('hint-mine');
+                                    grid[h.r][h.c].el.classList.remove('hint-safe');
+                                }
+                            });
+                            pendingHint = null;
+                        }, 2000);
+                        return;
+                    }
+                }
+                
+                if (-diff === U_B.length) {
+                    let hints = [];
+                    for(let n of U_B) {
+                        if(n.flagged !== 1) {
+                            n.el.classList.add('hint-mine');
+                            hints.push({r: n.r, c: n.c, type: 'flag'});
+                        }
+                    }
+                    for(let n of U_A) {
+                        if(!n.revealed && n.flagged !== 1) {
+                            n.el.classList.add('hint-safe');
+                            hints.push({r: n.r, c: n.c, type: 'reveal'});
+                        }
+                    }
+                    if (hints.length > 0) {
+                        pendingHint = hints;
+                        setTimeout(() => {
+                            hints.forEach(h => {
+                                if(grid[h.r][h.c]) {
+                                    grid[h.r][h.c].el.classList.remove('hint-mine');
+                                    grid[h.r][h.c].el.classList.remove('hint-safe');
+                                }
+                            });
+                            pendingHint = null;
+                        }, 2000);
+                        return;
+                    }
+                }
+            }
+        }
+
+        // Fallback for start of game
+        let hasRevealed = false;
+        for(let r=0; r<config.rows; r++) {
+            for(let c=0; c<config.cols; c++) {
+                if(grid[r][c] && grid[r][c].revealed) {
+                    hasRevealed = true;
+                    break;
+                }
+            }
+            if(hasRevealed) break;
+        }
+        if (!hasRevealed) {
+             const r = Math.floor(config.rows / 2);
+             const c = Math.floor(config.cols / 2);
+             if (grid[r][c]) {
+                 grid[r][c].el.classList.add('hint-safe');
+                 pendingHint = [{r, c, type: 'reveal'}];
+                 setTimeout(() => { 
+                     grid[r][c].el.classList.remove('hint-safe'); 
+                     pendingHint = null;
+                 }, 2000);
+             }
+        }
+    }
+
+    function clearHints() {
+        document.querySelectorAll('.hint-safe, .hint-mine').forEach(el => {
+            el.classList.remove('hint-safe');
+            el.classList.remove('hint-mine');
+        });
+    }
+
+    function analyzeBoard() {
+        if (gameMode !== 'standard') return alert("Analysis only available in standard modes.");
+        if (gameOver) return alert("Game is over.");
+        if (!minesPlaced) return alert("Make a move first.");
+
+        // Create simulation grid
+        let simGrid = [];
+        for(let r=0; r<config.rows; r++) {
+            simGrid[r] = [];
+            for(let c=0; c<config.cols; c++) {
+                let realTile = grid[r][c];
+                simGrid[r][c] = {
+                    r: r, c: c,
+                    isMine: realTile.isMine,
+                    neighborMines: realTile.neighborMines,
+                    revealed: realTile.revealed,
+                    flagged: realTile.flagged
+                };
+            }
+        }
+
+        const getNeighbors = (r, c) => {
+            let neighbors = [];
+            for (let dr = -1; dr <= 1; dr++) {
+                for (let dc = -1; dc <= 1; dc++) {
+                    if (dr === 0 && dc === 0) continue;
+                    let nr = r + dr, nc = c + dc;
+                    if (nr >= 0 && nr < config.rows && nc >= 0 && nc < config.cols) {
+                        neighbors.push(simGrid[nr][nc]);
+                    }
+                }
+            }
+            return neighbors;
+        };
+
+        const simReveal = (tile) => {
+            if (tile.revealed || tile.flagged === 1) return false;
+            tile.revealed = true;
+            let changed = true;
+            
+            if (tile.neighborMines === 0 && !tile.isMine) {
+                let queue = [tile];
+                while(queue.length > 0) {
+                    let curr = queue.shift();
+                    let ns = getNeighbors(curr.r, curr.c);
+                    ns.forEach(n => {
+                        if (!n.revealed && n.flagged !== 1) {
+                            n.revealed = true;
+                            if (n.neighborMines === 0 && !n.isMine) queue.push(n);
+                        }
+                    });
+                }
+            }
+            return changed;
+        };
+
+        let progress = true;
+        while(progress) {
+            progress = false;
+
+            // 1. Basic Steps
+            for(let r=0; r<config.rows; r++) {
+                for(let c=0; c<config.cols; c++) {
+                    let tile = simGrid[r][c];
+                    if(!tile.revealed || tile.neighborMines === 0) continue;
+
+                    let neighbors = getNeighbors(r, c);
+                    let flags = neighbors.filter(n => n.flagged === 1).length;
+                    let unrevealed = neighbors.filter(n => !n.revealed && n.flagged !== 1);
+
+                    if(unrevealed.length > 0 && unrevealed.length === tile.neighborMines - flags) {
+                        unrevealed.forEach(n => {
+                            if (n.flagged !== 1) {
+                                n.flagged = 1;
+                                progress = true;
+                            }
+                        });
+                    }
+
+                    if(unrevealed.length > 0 && flags === tile.neighborMines) {
+                        unrevealed.forEach(n => {
+                            if (simReveal(n)) progress = true;
+                        });
+                    }
+                }
+            }
+
+            if (progress) continue;
+
+            // 2. Advanced Steps
+            let activeTiles = [];
+            for(let r=0; r<config.rows; r++) {
+                for(let c=0; c<config.cols; c++) {
+                    let t = simGrid[r][c];
+                    if(t.revealed && t.neighborMines > 0) {
+                        let neighbors = getNeighbors(r, c);
+                        let unrevealed = neighbors.filter(n => !n.revealed && n.flagged !== 1);
+                        let flags = neighbors.filter(n => n.flagged === 1).length;
+                        
+                        if(unrevealed.length > 0) {
+                            activeTiles.push({
+                                r: r, c: c,
+                                eff: t.neighborMines - flags,
+                                unrevealed: unrevealed
+                            });
+                        }
+                    }
+                }
+            }
+
+            for(let i=0; i<activeTiles.length; i++) {
+                let A = activeTiles[i];
+                for(let j=i+1; j<activeTiles.length; j++) {
+                    let B = activeTiles[j];
+                    if(Math.abs(A.r - B.r) > 1 || Math.abs(A.c - B.c) > 1) continue;
+
+                    let U_A = A.unrevealed.filter(a => !B.unrevealed.includes(a));
+                    let U_B = B.unrevealed.filter(b => !A.unrevealed.includes(b));
+                    let diff = A.eff - B.eff;
+                    
+                    if (diff === U_A.length) {
+                        if (U_A.length > 0) U_A.forEach(n => { if(n.flagged !== 1) { n.flagged = 1; progress = true; } });
+                        if (U_B.length > 0) U_B.forEach(n => { if (simReveal(n)) progress = true; });
+                    } else if (-diff === U_B.length) {
+                        if (U_B.length > 0) U_B.forEach(n => { if(n.flagged !== 1) { n.flagged = 1; progress = true; } });
+                        if (U_A.length > 0) U_A.forEach(n => { if (simReveal(n)) progress = true; });
+                    }
+                    if (progress) break;
+                }
+                if (progress) break;
+            }
+        }
+
+        let solved = true;
+        for(let r=0; r<config.rows; r++) {
+            for(let c=0; c<config.cols; c++) {
+                if(!simGrid[r][c].isMine && !simGrid[r][c].revealed) {
+                    solved = false;
+                    break;
+                }
+            }
+            if(!solved) break;
+        }
+
+        alert(solved ? "No guessing" : "Needs guessing");
+    }
+
+    function changeTexturePack(packName) {
+        if (packName === 'custom') {
+            document.getElementById('folder-input').click();
+            return;
+        }
+
+        activeTexturePack = packName;
+        
+        if (activeTexturePack === 'system') {
+            // This mode now uses the SVGs in your texture_default folder
+            const path = `images/texture_default/`;
+            IMAGES.default = `<img src="${path}default.svg">`;
+            IMAGES.flag = `<img src="${path}flag.svg">`;
+            IMAGES.question = `<img src="${path}question_mark.svg">`;
+            IMAGES.blank = `<img src="${path}blank.svg">`;
+            IMAGES.mine_revealed = `<img src="${path}mine_revealed.png" class="mine-anim">`;
+            IMAGES.smile = `<img src="${path}smile.png">`;
+            IMAGES.dead = `<img src="${path}dead.png">`;
+            // Clear custom number images to use text
+            for (let i = 1; i <= 24; i++) delete IMAGES[i];
+        } else {
+            // For 'texture_default' or 'cursed_textures'
+            const path = `images/${activeTexturePack}/`;
+            
+            // Helper to handle mixed extensions (.svg for UI, .png for faces)
+            IMAGES.default = `<img src="${path}default.svg">`;
+            IMAGES.flag = `<img src="${path}flag.svg">`;
+            IMAGES.question = `<img src="${path}question_mark.svg">`;
+            IMAGES.blank = `<img src="${path}blank.svg">`;
+            IMAGES.mine_revealed = `<img src="${path}mine_revealed.png" class="mine-anim">`;
+            IMAGES.smile = `<img src="${path}smile.png">`;
+            IMAGES.dead = `<img src="${path}dead.png">`;
+
+            if (activeTexturePack === 'cursed_1') {
+                IMAGES.double_flag = `<img src="${path}double_flag.svg">`;
+                IMAGES.triple_flag = `<img src="${path}triple_flag.svg">`;
+                IMAGES.double_mine = `<img src="${path}double_mine.png" class="mine-anim">`;
+                IMAGES.triple_mine = `<img src="${path}triple_mine.png" class="mine-anim">`;
+            }
+            
+            for (let i = 1; i <= 24; i++) {
+                // Assuming numbers in subfolders are .svg based on your folder tree
+                IMAGES[i] = `<img src="${path}${i}.svg" onerror="this.parentNode.classList.add('n${i}'); this.parentNode.textContent='${i}'">`;
+            }
+        }
+
+        if (!gameOver) faceBtn.innerHTML = IMAGES.smile;
+        
+        for (let r = 0; r < config.rows; r++) {
+            for (let c = 0; c < config.cols; c++) {
+                if (grid[r][c]) updateTileVisuals(grid[r][c]);
+            }
+        }
+    }
+
+    function loadCustomTexturePack(input) {
+        if (!input.files || input.files.length === 0) return;
+
+        const files = Array.from(input.files);
+        const getFileUrl = (name) => {
+            const file = files.find(f => {
+                const baseName = f.name.substring(0, f.name.lastIndexOf('.')) || f.name;
+                return baseName.toLowerCase() === name.toLowerCase();
+            });
+            return file ? URL.createObjectURL(file) : null;
+        };
+
+        const getImgTag = (name, extraClass = '') => {
+            const url = getFileUrl(name);
+            return url ? `<img src="${url}" class="${extraClass}">` : null;
+        };
+
+        // Reset to default first
+        IMAGES.default = '<img src="images/default.svg">';
+        IMAGES.flag = '<img src="images/flag.svg">';
+        IMAGES.question = '<img src="images/question_mark.svg">';
+        IMAGES.blank = '<img src="images/blank.svg">';
+        IMAGES.mine_revealed = '<img src="images/mine_revealed.png" class="mine-anim">';
+        IMAGES.smile = '<img src="images/smile.png">';
+        IMAGES.dead = '<img src="images/dead.png">';
+
+        if (getImgTag('default')) IMAGES.default = getImgTag('default');
+        if (getImgTag('flag')) IMAGES.flag = getImgTag('flag');
+        if (getImgTag('question_mark')) IMAGES.question = getImgTag('question_mark');
+        if (getImgTag('blank')) IMAGES.blank = getImgTag('blank');
+        if (getImgTag('mine_revealed')) IMAGES.mine_revealed = getImgTag('mine_revealed', 'mine-anim');
+        if (getImgTag('smile')) IMAGES.smile = getImgTag('smile');
+        if (getImgTag('dead')) IMAGES.dead = getImgTag('dead');
+
+        for (let i = 1; i <= 8; i++) {
+            const tag = getImgTag(i.toString());
+            if (tag) IMAGES[i] = tag;
+            else delete IMAGES[i];
+        }
+
+        activeTexturePack = 'custom';
+        if (!gameOver) faceBtn.innerHTML = IMAGES.smile;
+        for (let r = 0; r < config.rows; r++) {
+            for (let c = 0; c < config.cols; c++) {
+                if (grid[r][c]) updateTileVisuals(grid[r][c]);
+            }
+        }
+        input.value = '';
+    }
+
+    function updateTileVisuals(tile) {
+        tile.el.innerHTML = '';
+        tile.el.className = 'tile';
+
+        const xray = document.getElementById('xray-check');
+        const forceReveal = xray && xray.checked && hoveredTile && hoveredTile.r === tile.r && hoveredTile.c === tile.c && !tile.revealed;
+        
+        if (forceReveal) tile.el.style.opacity = '0.5';
+        else tile.el.style.opacity = '';
+        
+        if (gameMode === 'falling' && !tile.active) {
+            tile.el.classList.add('empty');
+            return;
+        }
+        
+        if (tile.isCleared) {
+            tile.el.classList.add('cleared-row');
+        }
+        
+        if (tile.revealed || forceReveal) {
+            tile.el.classList.add('revealed');
+            
+            // Always show blank.svg as the base for revealed tiles
+            const blankImg = IMAGES.blank; 
+            
+            if (tile.isMine) {
+                // Layer the mine on top of the blank tile
+                let mineImg = IMAGES.mine_revealed;
+                if (gameMode === 'cursed_multi_mine') {
+                    if (tile.mineCount === 2) mineImg = IMAGES.double_mine;
+                    else if (tile.mineCount === 3) mineImg = IMAGES.triple_mine;
+                }
+
+                if (tile.revealed || forceReveal) {
+                    mineImg = mineImg.replace('mine-anim', '');
+                }
+
+                tile.el.innerHTML = blankImg + mineImg;
+                // Add a style to stack them if they aren't stacking correctly
+                tile.el.style.position = 'relative';
+                tile.el.lastElementChild.style.position = 'absolute';
+            } else if (tile.neighborMines > 0) {
+                if (activeTexturePack === 'system') {
+                    tile.el.textContent = tile.neighborMines;
+                    tile.el.classList.add(`n${tile.neighborMines}`);
+                } else {
+                    // Layer the number SVG on top of the blank SVG
+                    tile.el.innerHTML = blankImg + (IMAGES[tile.neighborMines] || '');
+                    if (tile.el.children.length > 1) {
+                        tile.el.style.position = 'relative';
+                        tile.el.lastElementChild.style.position = 'absolute';
+                    }
+                }
+            } else {
+                tile.el.innerHTML = blankImg;
+            }
+        } else {
+            tile.el.classList.add('hidden');
+            if (tile.flagged === 1) {
+                // Layer flag on top of default background
+                tile.el.innerHTML = IMAGES.default + IMAGES.flag;
+                tile.el.style.position = 'relative';
+                tile.el.lastElementChild.style.position = 'absolute';
+            } else if (tile.flagged === 2 && gameMode === 'cursed_multi_mine') {
+                tile.el.innerHTML = IMAGES.default + IMAGES.double_flag;
+                tile.el.style.position = 'relative';
+                tile.el.lastElementChild.style.position = 'absolute';
+            } else if (tile.flagged === 3 && gameMode === 'cursed_multi_mine') {
+                tile.el.innerHTML = IMAGES.default + IMAGES.triple_flag;
+                tile.el.style.position = 'relative';
+                tile.el.lastElementChild.style.position = 'absolute';
+            } else if ((tile.flagged === 2 && gameMode !== 'cursed_multi_mine') || (tile.flagged === 4 && gameMode === 'cursed_multi_mine')) {
+                // Layer question mark on top of default background
+                tile.el.innerHTML = IMAGES.default + IMAGES.question;
+                tile.el.style.position = 'relative';
+                tile.el.lastElementChild.style.position = 'absolute';
+            } else {
+                tile.el.innerHTML = IMAGES.default;
+            }
+        }
+    }
+
+    faceBtn.addEventListener('click', () => resetGame());
+
+    // Initialize first game
+    startGame('beginner');
+</script>
+
+</body>
+</html>

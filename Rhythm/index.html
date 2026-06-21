@@ -1,0 +1,1761 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rhythm</title>
+    <style>
+        :root {
+            --red: #ff4d4d;
+            --blue: #4d94ff;
+            --green: #4dff4d;
+            --yellow: #ffff4d;
+            --bg: #1a1a1a;
+            --note-height: 50px;
+        }
+
+        body {
+            margin: 0;
+            background-color: var(--bg);
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            overflow: hidden;
+            touch-action: manipulation;
+            /* Prevents text selection */
+            -webkit-user-select: none;  /* Safari on iOS */
+            user-select: none;
+            /* Prevents the long-press "copy/paste" context menu */
+            -webkit-touch-callout: none;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 10;
+            text-align: left;
+            background: rgba(0,0,0,0.85);
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid #444;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            width: 400px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .hidden { display: none !important; }
+
+        h1 { margin-top: 0; text-align: center; font-size: 22px; margin-bottom: 10px; }
+
+        .menu-section {
+            margin-bottom: 12px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #333;
+        }
+
+        .menu-section p { margin: 0 0 5px 0; font-weight: bold; font-size: 14px; }
+        
+        input[type="file"], input[type="range"] {
+            width: 100%;
+            margin-bottom: 10px;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        button {
+            padding: 8px 12px;
+            cursor: pointer;
+            background: #444;
+            color: white;
+            border: 1px solid #666;
+            border-radius: 5px;
+            font-weight: bold;
+            font-size: 13px;
+            transition: background 0.2s;
+            flex: 1;
+        }
+
+        button:hover { background: #666; }
+
+        #game-container {
+            position: relative;
+            width: 400px;
+            height: 100vh;
+            background: rgba(34, 34, 34, 0.7);
+            border-left: 4px solid #444;
+            border-right: 4px solid #444;
+            display: flex;
+            touch-action: none;
+        }
+
+        #bg-video {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        .lane {
+            flex: 1;
+            position: relative;
+            border-right: 1px solid #333;
+            height: 100%;
+        }
+
+        .lane:last-child { border-right: none; }
+
+        /* Hit Zones */
+        .hit-zone {
+            position: absolute;
+            bottom: 50px;
+            width: 100%;
+            height: 20px;
+            border-top: 4px solid white;
+            opacity: 0.5;
+        }
+
+        .key-indicator {
+            position: absolute;
+            bottom: 10px;
+            width: 100%;
+            text-align: center;
+            font-weight: bold;
+            font-size: 20px;
+        }
+
+        /* Note Styling */
+        .note {
+            position: absolute;
+            width: 90%;
+            left: 5%;
+            border-radius: 20px;
+            box-shadow: 0 0 10px rgba(255,255,255,0.3);
+        }
+
+        .note.tap { height: var(--note-height); }
+
+        .note-0 { background-color: var(--red); }
+        .note-1 { background-color: var(--blue); }
+        .note-2 { background-color: var(--green); }
+        .note-3 { background-color: var(--yellow); }
+        .note-4 { background-color: #ff8c00; }
+        .note-5 { background-color: #da70d6; }
+
+        /* Visual Feedback */
+        .lane-press {
+            position: absolute;
+            bottom: 50px;
+            width: 100%;
+            height: 150px;
+            background: linear-gradient(to top, white, transparent);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.05s;
+        }
+
+        .active-press { opacity: 0.3; }
+
+        /* Edge Progress Bar */
+        #stage-progress-svg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+            z-index: 300;
+        }
+
+        #stage-progress-bar {
+            x: 5px;
+            y: 5px;
+            width: calc(100vw - 10px);
+            height: calc(100vh - 10px);
+            fill: none;
+            stroke: white;
+            stroke-width: 8;
+            stroke-dasharray: 0 100;
+            transition: stroke-dasharray 0.1s linear, stroke 0.3s;
+        }
+
+        /* Side Effects */
+        .side-effect {
+            position: absolute;
+            top: 0;
+            width: 150px;
+            height: 100%;
+            z-index: 5;
+            opacity: 0;
+            transition: opacity 0.4s, background 0.4s, box-shadow 0.4s;
+            pointer-events: none;
+        }
+        #side-l { 
+            right: 100%; 
+            left: auto;
+            -webkit-mask-image: linear-gradient(to left, black, transparent);
+            mask-image: linear-gradient(to left, black, transparent);
+        }
+        #side-r { 
+            left: 100%; 
+            right: auto;
+            -webkit-mask-image: linear-gradient(to right, black, transparent);
+            mask-image: linear-gradient(to right, black, transparent);
+        }
+
+        .side-x2 { 
+            opacity: 1; 
+            background: #add8e6; 
+            box-shadow: 0 0 20px #add8e6; 
+        }
+        .side-x4 { 
+            opacity: 1; 
+            background: #a020f0; 
+            box-shadow: 0 0 20px #a020f0; 
+        }
+        .side-x6 {
+            opacity: 1;
+            background: linear-gradient(to bottom, #ff0000, #ff7f00, #ffff00, #00ff00, #0000ff, #4b0082, #8b00ff, #ff0000);
+            background-size: 100% 100%;
+            animation: rainbow-scroll 1.5s linear infinite;
+            box-shadow: 0 0 25px rgba(255,255,255,0.6);
+        }
+
+        @keyframes rainbow-scroll {
+            0% { background-position-y: 0; }
+            100% { background-position-y: -100vh; }
+        }
+
+        #combo-counter {
+            font-size: 48px;
+            font-weight: bold;
+            color: white;
+            opacity: 0.6;
+            text-align: center;
+            width: 100%;
+            position: absolute;
+            top: 150px;
+            pointer-events: none;
+        }
+
+        @keyframes combo-scroll {
+            0% { transform: translateY(15px) scale(0.8); opacity: 0; }
+            100% { transform: translateY(0) scale(1); opacity: 0.6; }
+        }
+
+        .combo-animate {
+            animation: combo-scroll 0.1s ease-out;
+        }
+
+        /* Hit Classifications */
+        @keyframes float-up {
+            0% { transform: translate(-50%, 0); opacity: 1; }
+            100% { transform: translate(-50%, -40px); opacity: 0; }
+        }
+
+        .classification {
+            position: absolute;
+            bottom: 120px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 22px;
+            font-weight: bold;
+            pointer-events: none;
+            z-index: 20;
+            animation: float-up 0.5s ease-out forwards;
+            white-space: nowrap;
+            text-align: center;
+        }
+
+        .clr-miss { color: magenta; text-shadow: 0 0 5px magenta; }
+        .clr-good { color: var(--green); text-shadow: 0 0 5px var(--green); }
+        .clr-great { color: var(--blue); text-shadow: 0 0 5px var(--blue); }
+        .clr-excellent { color: gold; text-shadow: 0 0 8px gold; }
+        .clr-perfect { color: #fff; text-shadow: 0 0 12px #ffcc00, 0 0 20px #ffcc00; font-size: 26px; }
+
+        /* Animations */
+
+        @keyframes particle-fade {
+            0% { transform: translate(0,0) scale(1); opacity: 1; }
+            100% { transform: translate(var(--tx), var(--ty)) scale(0); opacity: 0; }
+        }
+        .particle {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 6;
+            animation: particle-fade 0.5s ease-out forwards;
+        }
+
+        #status-panel {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 10px;
+            z-index: 100;
+        }
+
+        #health-bar-container {
+            width: 250px;
+            height: 20px;
+            background: #333;
+            border: 2px solid #555;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        #health-bar {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(to right, var(--red), var(--green));
+            transition: width 0.1s ease-out;
+        }
+
+        #ingame-ui {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 100;
+        }
+
+        #score-display {
+            font-size: 28px;
+            font-weight: bold;
+            background: rgba(0,0,0,0.5);
+            padding: 10px 20px;
+            border-radius: 8px;
+            white-space: nowrap;
+        }
+
+        #countdown {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 80px;
+            font-weight: bold;
+            pointer-events: none;
+            z-index: 100;
+            text-shadow: 0 4px 10px rgba(0,0,0,0.8);
+        }
+
+        #result-screen {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.95);
+            padding: 40px;
+            border-radius: 15px;
+            border: 2px solid #444;
+            z-index: 200;
+            text-align: center;
+            min-width: 300px;
+            box-shadow: 0 0 30px rgba(0,0,0,1);
+        }
+
+        #result-stats {
+            margin: 20px 0;
+            text-align: left;
+            display: inline-block;
+        }
+
+        .stat-line {
+            font-size: 20px;
+            margin: 5px 0;
+            font-weight: bold;
+        }
+
+        #result-final-score {
+            font-size: 32px;
+            color: var(--yellow);
+            margin-bottom: 20px;
+        }
+
+        #song-progress-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.1);
+            z-index: 1000;
+        }
+
+        #song-progress-fill {
+            width: 0%;
+            height: 100%;
+            background: var(--blue);
+            box-shadow: 0 0 10px var(--blue);
+            transition: width 0.1s linear;
+        }
+
+        #lyrics-display {
+            position: absolute;
+            bottom: 150px;
+            width: 100%;
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+            color: white;
+            text-shadow: 0 0 10px rgba(0,0,0,1), 0 0 5px rgba(0,0,0,1);
+            pointer-events: none;
+            z-index: 50;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="song-progress-container" class="hidden">
+        <div id="song-progress-fill"></div>
+    </div>
+
+    <svg id="stage-progress-svg">
+        <rect id="stage-progress-bar" pathLength="100" />
+    </svg>
+
+    <video id="bg-video" class="hidden" playsinline></video>
+
+    <div id="status-panel">
+        <div id="score-display">Score: 0</div>
+        <div id="health-bar-container" class="hidden">
+            <div id="health-bar"></div>
+        </div>
+    </div>
+    <div id="countdown"></div>
+
+    <div id="result-screen" class="hidden">
+        <h1 id="result-title">Song Completed</h1>
+        <div id="result-final-score">Score: 0</div>
+        <div id="result-stats"></div>
+        <div class="btn-group" style="margin-top: 20px;">
+            <button id="retry-btn" style="background: var(--green); color: black;">Retry</button>
+            <button onclick="exitGame()">Main Menu</button>
+        </div>
+    </div>
+
+    <div id="ingame-ui" class="hidden">
+        <button id="pause-btn" onclick="togglePause()">Pause</button>
+        <button onclick="exitGame()">Exit</button>
+        <label style="margin-left: 10px; font-size: 13px; vertical-align: middle; cursor: pointer;">
+            <input type="checkbox" id="auto-play-ingame" onchange="syncAutoPlay(this.checked)"> Auto-Play
+        </label>
+    </div>
+
+    <div id="ui-layer">
+        <h1>Rhythm</h1>
+        <div id="setup-menu">
+            <div class="menu-section">
+                <p>1. Upload Song or Video</p>
+                <input type="file" id="audio-input" accept="audio/*,video/*">
+            </div>
+
+            <div class="menu-section">
+                <p>2. Auto-Gen Sensitivity</p>
+                <small style="display:block; margin-bottom: 5px; color:#aaa;" id="sens-val">Current: 0.2 (Lower = More Notes)</small>
+                <input type="range" id="sensitivity" min="0.005" max="0.8" step="0.005" value="0.2" oninput="document.getElementById('sens-val').innerText = `Current: ${this.value} (Lower = More Notes)`">
+                <label style="font-size: 13px; color: #aaa; cursor: pointer; display: block; margin-top: 5px;">
+                    <input type="checkbox" id="prevent-triple-taps" onchange="preventTripleTaps = this.checked">
+                    Prevent Triple Jacks (3+ notes in row on same lane)
+                </label>
+            </div>
+            
+            <div class="menu-section">
+                <p>3. Auto-Play</p>
+                <label style="font-size: 13px; color: #aaa; cursor: pointer;">
+                    <input type="checkbox" id="auto-play-checkbox" onchange="syncAutoPlay(this.checked)">
+                    Enable Auto-Play (Bot will play for you)
+                </label>
+            </div>
+
+            <button onclick="toggleSettingsMenu()" style="width: 100%; margin-bottom: 12px;">Settings</button>
+
+            <div class="btn-group">
+                <button onclick="initGame('play')" style="background: var(--green); color: black;">Play Game</button>
+                <button onclick="initGame('record')">Record Tool</button>
+                <button onclick="initGame('lyrics')">Lyrics Tool</button>
+            </div>
+        </div>
+
+        <div id="recording-ui" class="hidden">
+            <h2 style="color: var(--red); text-align: center;">RECORDING MODE</h2>
+            <p style="text-align: center;">Tap or Hold D, F, J, K to record notes to the music.</p>
+            <div style="width: 100%; height: 8px; background: #333; margin: 15px 0; border-radius: 4px; overflow: hidden;">
+                <div id="record-progress-bar" style="width: 0%; height: 100%; background: var(--red);"></div>
+            </div>
+            <p style="text-align: center; font-size: 11px; color: #888; margin-bottom: 10px;">Arrow Left/Right to Seek (5s)</p>
+            <button onclick="exportData()" style="width: 100%; margin-top: 10px;">Stop & Download TXT</button>
+        </div>
+
+        <div id="lyrics-recording-ui" class="hidden">
+            <h2 style="color: var(--blue); text-align: center;">LYRICS RECORDING</h2>
+            <p style="text-align: center; font-size: 14px;">Press Space to pause and type the lyric for that moment.</p>
+            <div style="width: 100%; height: 8px; background: #333; margin: 15px 0; border-radius: 4px; overflow: hidden;">
+                <div id="lyrics-progress-bar" style="width: 0%; height: 100%; background: var(--blue);"></div>
+            </div>
+            <p style="text-align: center; font-size: 11px; color: #888; margin-bottom: 10px;">Arrow Left/Right to Seek (5s)</p>
+            <div id="lyric-entry-area" class="hidden" style="margin-top: 15px; background: #333; padding: 15px; border-radius: 8px;">
+                <p style="margin: 0 0 10px 0; font-size: 14px;">Lyric for <span id="current-lyric-ts">0</span>ms:</p>
+                <input type="text" id="active-lyric-input" placeholder="Type here..." style="padding: 10px; width: calc(100% - 22px); background: #222; color: white; border: 1px solid #555; border-radius: 4px;">
+                <p style="font-size: 11px; color: #aaa; margin: 10px 0 0 0;">Press <b>Enter</b> to save & resume.</p>
+            </div>
+            <div id="recorded-lyrics-preview" style="margin-top: 15px; max-height: 120px; overflow-y: auto; font-size: 12px; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 5px; text-align: left; font-family: monospace;"></div>
+            <button onclick="exportLyrics()" style="width: 100%; margin-top: 15px; background: var(--blue); color: white;">Stop & Download Lyrics</button>
+        </div>
+    </div>
+
+    <div id="settings-menu" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 500; overflow-y: auto; padding: 20px; box-sizing: border-box;">
+        <div style="background: #1a1a1a; padding: 25px; border-radius: 15px; border: 1px solid #444; width: 100%; max-width: 400px; box-shadow: 0 0 20px rgba(0,0,0,0.5); margin: 40px auto;">
+            <h2 style="margin-top: 0; text-align: center;">Settings</h2>
+            
+            <div class="menu-section">
+                <p>Game Data (Optional)</p>
+                <small style="display:block; margin-bottom: 5px; color:#aaa;">Leave empty to auto-generate rhythm!</small>
+                <input type="file" id="data-input" accept=".txt">
+            </div>
+
+            <div class="menu-section">
+                <p>Lyrics Data (Optional)</p>
+                <input type="file" id="lyrics-input" accept=".txt">
+            </div>
+
+            <div class="menu-section">
+                <p>Lane Count</p>
+                <div class="btn-group" id="lane-count-btns">
+                    <button onclick="setLaneCount(2)" id="lc-btn-2">2</button>
+                    <button onclick="setLaneCount(3)" id="lc-btn-3">3</button>
+                    <button onclick="setLaneCount(4)" id="lc-btn-4" style="background: var(--green); color: black;">4</button>
+                    <button onclick="setLaneCount(5)" id="lc-btn-5">5</button>
+                    <button onclick="setLaneCount(6)" id="lc-btn-6">6</button>
+                </div>
+            </div>
+
+            <div class="menu-section">
+                <p>Keybind Settings</p>
+                <button onclick="toggleKeybindMenu()" style="width: 100%;">Change Keybinds</button>
+            </div>
+
+            <div class="menu-section">
+                <p>Note Speed</p>
+                <small style="display:block; margin-bottom: 5px; color:#aaa;" id="speed-val">Current: 1.0x</small>
+                <input type="range" id="note-speed-slider" min="0.5" max="4.0" step="0.1" value="1.0" oninput="updateNoteSpeedUI(this.value)">
+            </div>
+
+            <div class="menu-section">
+                <p>Note Height</p>
+                <small style="display:block; margin-bottom: 5px; color:#aaa;" id="height-val">Current: 50px</small>
+                <input type="range" id="note-height-slider" min="20" max="100" step="1" value="50" oninput="updateNoteHeightUI(this.value)">
+                <div id="note-preview-container" style="width: 100%; height: 120px; background: #222; border: 1px solid #333; margin-top: 10px; display: flex; align-items: center; justify-content: center; position: relative; border-radius: 8px; overflow: hidden;">
+                    <div id="note-preview" class="note note-2 tap" style="position: static; width: 80%;"></div>
+                </div>
+            </div>
+
+            <div class="menu-section">
+                <p>Timing Calibration (Offset) *Deprecated*</p>
+                <small style="display:block; margin-bottom: 5px; color:#aaa;" id="offset-val">Current: 0ms</small>
+                <div id="calibration-container" style="width: 100%; height: 150px; background: #222; border: 1px solid #333; position: relative; border-radius: 8px; overflow: hidden; cursor: ns-resize;">
+                    <div style="position: absolute; top: 50%; width: 100%; height: 2px; background: white; opacity: 0.5; transform: translateY(-50%);"></div>
+                    <div id="calibration-note" class="note note-1 tap" style="position: absolute; top: 50%; left: 10%; width: 80%; transform: translateY(-50%); pointer-events: none;"></div>
+                </div>
+                <small style="display:block; margin-top: 5px; color:#888;">Drag the note relative to the center line to adjust audio sync.</small>
+            </div>
+
+            <div class="menu-section">
+                <p>Song Volume in Auto-Play</p>
+                <small style="display:block; margin-bottom: 5px; color:#aaa;" id="ap-vol-val">Current: 20%</small>
+                <input type="range" id="ap-vol-slider" min="0.2" max="1.0" step="0.05" value="0.2" oninput="updateAutoPlayVolumeUI(this.value)">
+            </div>
+
+            <div class="menu-section">
+                <p>SFX Settings</p>
+                <label style="font-size: 13px; color: #aaa; cursor: pointer;">
+                    <input type="checkbox" id="kb-sfx-checkbox" checked onchange="keyboardSFXEnabled = this.checked">
+                    Keyboard Sound Effects
+                </label>
+            </div>
+
+            <button onclick="saveSettings()" style="background: var(--blue); color: white; padding: 10px; width: 100%; font-weight: bold; margin-bottom: 10px; border-radius: 5px; border: 1px solid #666; cursor: pointer;">Save Settings to LocalStorage</button>
+            <button onclick="toggleSettingsMenu()" style="background: var(--green); color: black; padding: 10px; width: 100%; font-weight: bold; margin-top: 10px;">Close Settings</button>
+        </div>
+    </div>
+
+    <div id="keybind-menu" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 600; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+        <h2>Configure Keybinds</h2>
+        <p>Click a lane to change its key:</p>
+        <div id="kb-config-row" style="display: flex; gap: 20px; margin-bottom: 30px; flex-wrap: wrap; justify-content: center;">
+            <!-- Populated dynamically by buildKeybindMenu() -->
+        </div>
+        <button onclick="toggleKeybindMenu()" style="background: var(--green); color: black; padding: 10px 40px;">Save & Close</button>
+    </div>
+
+    <div id="game-container">
+        <div id="side-l" class="side-effect"></div>
+        <div id="side-r" class="side-effect"></div>
+        <div id="combo-counter"></div>
+        <div id="lyrics-display"></div>
+        <!-- Lanes are built dynamically by rebuildLanes() -->
+    </div>
+
+    <script>
+        const audioInput = document.getElementById('audio-input');
+        const dataInput = document.getElementById('data-input');
+        const lyricsInput = document.getElementById('lyrics-input');
+        const sensitivityInput = document.getElementById('sensitivity');
+
+        const LANE_COLORS_ALL = ['#ff4d4d', '#4d94ff', '#4dff4d', '#ffff4d', '#ff8c00', '#da70d6'];
+        const LANE_BORDER_COLORS = ['var(--red)', 'var(--blue)', 'var(--green)', 'var(--yellow)', '#ff8c00', '#da70d6'];
+
+        // Default key sets per lane count
+        const DEFAULT_KEY_SETS = {
+            2: ['d', 'k'],
+            3: ['d', 'f', 'k'],
+            4: ['d', 'f', 'j', 'k'],
+            5: ['d', 'f', 'g', 'j', 'k'],
+            6: ['d', 'f', 'g', 'h', 'j', 'k']
+        };
+
+        let laneCount = 4;
+        let lanes = [];
+        let LANE_COLORS = LANE_COLORS_ALL.slice(0, laneCount);
+        let KEY_MAP = { 'd': 0, 'f': 1, 'j': 2, 'k': 3 };
+
+        function rebuildLanes() {
+            // Remove old lane elements
+            document.querySelectorAll('.lane').forEach(el => el.remove());
+
+            const container = document.getElementById('game-container');
+            const sideR = document.getElementById('side-r');
+            lanes = [];
+
+            const keys = DEFAULT_KEY_SETS[laneCount];
+            LANE_COLORS = LANE_COLORS_ALL.slice(0, laneCount);
+
+            for (let i = 0; i < laneCount; i++) {
+                const lane = document.createElement('div');
+                lane.className = 'lane';
+                lane.id = `lane-${i}`;
+                lane.innerHTML = `<div class="lane-press"></div><div class="hit-zone"></div><div class="key-indicator">${keys[i].toUpperCase()}</div>`;
+                
+                // Add pointer events for mobile support
+                lane.addEventListener('pointerdown', (e) => {
+                    e.preventDefault();
+                    handleLanePress(i);
+                });
+                lane.addEventListener('pointerup', (e) => {
+                    e.preventDefault();
+                    handleLaneRelease(i);
+                });
+                lane.addEventListener('pointerleave', (e) => {
+                    handleLaneRelease(i);
+                });
+
+                container.insertBefore(lane, sideR);
+                lanes.push(lane);
+            }
+
+            // Rebuild KEY_MAP from current key set
+            KEY_MAP = {};
+            keys.forEach((key, idx) => { KEY_MAP[key] = idx; });
+
+            buildKeybindMenu();
+        }
+
+        function buildKeybindMenu() {
+            const row = document.getElementById('kb-config-row');
+            row.innerHTML = '';
+            const keys = DEFAULT_KEY_SETS[laneCount];
+            for (let i = 0; i < laneCount; i++) {
+                const currentKey = Object.entries(KEY_MAP).find(([k, v]) => v === i)?.[0] || keys[i];
+                const div = document.createElement('div');
+                div.className = 'kb-config';
+                div.setAttribute('onclick', `captureKey(${i})`);
+                div.style.cssText = `border: 2px solid ${LANE_BORDER_COLORS[i]}; padding: 10px; text-align: center; border-radius: 8px; cursor: pointer;`;
+                div.innerHTML = `<div style="font-size: 10px; color: #aaa;">Lane ${i + 1}</div><div id="kb-${i}" style="font-size: 24px; font-weight: bold;">${currentKey.toUpperCase()}</div>`;
+                row.appendChild(div);
+            }
+        }
+
+        function setLaneCount(count) {
+            laneCount = count;
+            // Reset KEY_MAP to defaults for this lane count
+            KEY_MAP = {};
+            DEFAULT_KEY_SETS[count].forEach((key, idx) => { KEY_MAP[key] = idx; });
+            rebuildLanes();
+
+            // Update button highlights
+            for (let i = 2; i <= 6; i++) {
+                const btn = document.getElementById(`lc-btn-${i}`);
+                if (btn) {
+                    btn.style.background = i === count ? 'var(--green)' : '#444';
+                    btn.style.color = i === count ? 'black' : 'white';
+                }
+            }
+        }
+
+        // Initial build
+        rebuildLanes();
+
+        const audio = document.getElementById('bg-video');
+        let gameState = 'menu';
+        let recordedNotes = [];
+        let recordedLyrics = [];
+        let mapNotes = [];
+        let mapLyrics = [];
+        let score = 0;
+        let combo = 0;
+        let maxCombo = 0;
+        let multiplier = 1;
+        let activeHoldNotes = {}; 
+        let internalTime = 0; 
+        let lastFrameTime = 0;
+        let isPaused = false;
+        let health = 100;
+        let isAutoPlay = false;
+        let keyboardSFXEnabled = true;
+        let autoPlayVolumeLevel = 0.2;
+        let noteHeight = 50;
+        let timingOffset = 0;
+        let preventTripleTaps = false;
+
+        function updateOffsetUI(offsetMs) {
+            timingOffset = offsetMs;
+            document.getElementById('offset-val').innerText = `Current: ${Math.round(timingOffset)}ms`;
+            const noteEl = document.getElementById('calibration-note');
+            const yOffset = (timingOffset / 1000) * NOTE_SPEED;
+            noteEl.style.transform = `translateY(calc(-50% + ${yOffset}px))`;
+        }
+
+        // Setup Calibration Dragging
+        const calCont = document.getElementById('calibration-container');
+        let isDraggingOffset = false;
+        calCont.addEventListener('pointerdown', (e) => { isDraggingOffset = true; updateOffsetFromEvent(e); });
+        window.addEventListener('pointermove', (e) => { if (isDraggingOffset) updateOffsetFromEvent(e); });
+        window.addEventListener('pointerup', () => { isDraggingOffset = false; });
+        
+        function updateOffsetFromEvent(e) {
+            const rect = calCont.getBoundingClientRect();
+            const dy = e.clientY - (rect.top + rect.height / 2);
+            updateOffsetUI((dy / NOTE_SPEED) * 1000);
+        }
+
+        function updateNoteHeightUI(val) {
+            noteHeight = parseInt(val);
+            document.getElementById('height-val').innerText = `Current: ${val}px`;
+            document.getElementById('note-preview').style.height = `${val}px`;
+            document.documentElement.style.setProperty('--note-height', `${val}px`);
+        }
+
+        function updateAutoPlayVolumeUI(val) {
+            autoPlayVolumeLevel = parseFloat(val);
+            document.getElementById('ap-vol-val').innerText = `Current: ${(autoPlayVolumeLevel * 100).toFixed(0)}%`;
+        }
+
+        function toggleSettingsMenu() {
+            const menu = document.getElementById('settings-menu');
+            menu.classList.toggle('hidden');
+        }
+
+        function syncAutoPlay(val) {
+            isAutoPlay = val;
+            document.getElementById('auto-play-checkbox').checked = val;
+            document.getElementById('auto-play-ingame').checked = val;
+        }
+
+        let stats = { PERFECT: 0, EXCELLENT: 0, GREAT: 0, GOOD: 0, MISS: 0 };
+        let currentCapturingLane = null;
+
+        let NOTE_SPEED = 400; // Pixels per second
+
+        function updateNoteSpeedUI(val) {
+            document.getElementById('speed-val').innerText = `Current: ${val}x`;
+            NOTE_SPEED = 400 * parseFloat(val);
+            updateOffsetUI(timingOffset); // Sync calibration preview with new speed
+        }
+
+        const HIT_WINDOW = 150; // Milliseconds for a "Good" hit
+
+        const WINDOWS = {
+            PERFECT: 40,
+            EXCELLENT: 80,
+            GREAT: 120,
+            GOOD: 150
+        };
+
+        const HEALTH_GAIN = 2;
+        const HEALTH_LOSS_MISS = 10;
+        const HEALTH_LOSS_WRONG = 10;
+
+        // ==========================================
+        // RHYTHM GENERATOR (Taps & Holds)
+        // ==========================================
+        async function analyzeAudio(file, sensitivity) {
+            const arrayBuffer = await file.arrayBuffer();
+            const tempCtx = new AudioContext();
+            const audioBuffer = await tempCtx.decodeAudioData(arrayBuffer);
+
+            const offlineCtx = new OfflineAudioContext(
+                audioBuffer.numberOfChannels,
+                audioBuffer.length,
+                audioBuffer.sampleRate
+            );
+
+            const source = offlineCtx.createBufferSource();
+            source.buffer = audioBuffer;
+
+            // Bandpass filter isolates melodic ranges (vocals/leads) and rhythmic transients
+            const filter = offlineCtx.createBiquadFilter();
+            filter.type = "bandpass";
+            filter.frequency.value = 1200; 
+            filter.Q.value = 0.8;
+
+            source.connect(filter);
+            filter.connect(offlineCtx.destination);
+            source.start(0);
+
+            const renderedBuffer = await offlineCtx.startRendering();
+            const data = renderedBuffer.getChannelData(0);
+            const sampleRate = renderedBuffer.sampleRate;
+
+            const generatedBeats = [];
+            const threshold = parseFloat(sensitivity);
+
+            const chunkSize = 512;
+            let prevEnergy = 0;
+            let lastStartTime = -100;
+            let laneFreeAt = new Array(laneCount).fill(0);
+            let laneHistory = Array.from({length: laneCount}, () => []);
+
+            for (let i = 0; i < data.length - chunkSize; i += chunkSize) {
+                let energy = 0;
+                for (let j = 0; j < chunkSize; j++) {
+                    energy += data[i + j] * data[i + j];
+                }
+                energy = Math.sqrt(energy / chunkSize);
+
+                // Energy flux detection identifies the "attack" or onset of a note
+                const flux = Math.max(0, energy - prevEnergy);
+                const currentTimeMs = (i / sampleRate) * 1000;
+
+                // Detect onsets based on sudden increases in melodic energy
+                if (flux > threshold * 0.15) {
+                    // Ensure notes aren't spammed too close together (min 100ms start gap between groups)
+                    if (currentTimeMs > lastStartTime + 100) {
+                        // Filter pool to lanes that are currently free
+                        const lanePool = Array.from({length: laneCount}, (_, idx) => idx)
+                                            .filter(l => {
+                                                const isFree = laneFreeAt[l] < currentTimeMs;
+                                                if (!isFree) return false;
+                                                if (preventTripleTaps) {
+                                                    const hist = laneHistory[l];
+                                                    if (hist.length >= 2) {
+                                                        // If gap between 1st and candidate 3rd note is < 400ms, block it
+                                                        if (currentTimeMs - hist[0] < 400) return false;
+                                                    }
+                                                }
+                                                return true;
+                                            });
+                        
+                        if (lanePool.length === 0) { prevEnergy = energy; continue; }
+
+                        // Heuristic to estimate note duration for long notes
+                        let duration = 0;
+                        let checkIdx = i + chunkSize;
+                        while (checkIdx < data.length - chunkSize && duration < 1000) {
+                            let nextEnergy = 0;
+                            for (let k = 0; k < chunkSize; k++) nextEnergy += data[checkIdx + k] * data[checkIdx + k];
+                            nextEnergy = Math.sqrt(nextEnergy / chunkSize);
+                            if (nextEnergy < energy * 0.6) break;
+                            duration += (chunkSize / sampleRate) * 1000;
+                            checkIdx += chunkSize;
+                        }
+
+                        // Chord logic: allow multiple notes at once, but sparingly
+                        let numNotes = 1;
+                        const chordRoll = Math.random();
+                        if (chordRoll > 0.99) numNotes = Math.min(3, lanePool.length); 
+                        else if (chordRoll > 0.85) numNotes = Math.min(2, lanePool.length);
+
+                        lastStartTime = currentTimeMs;
+
+                        for (let n = 0; n < numNotes; n++) {
+                            const poolIdx = Math.floor(Math.random() * lanePool.length);
+                            const lane = lanePool.splice(poolIdx, 1)[0];
+
+                            // Only one note in a chord can be a long note to keep patterns readable
+                            let isLongNote = n === 0 && duration > 250 && Math.random() < 0.4;
+                            let noteEndTime = isLongNote ? currentTimeMs + duration : null;
+                            
+                            laneFreeAt[lane] = (noteEndTime || currentTimeMs) + 100;
+                            if (preventTripleTaps) {
+                                laneHistory[lane].push(currentTimeMs);
+                                if (laneHistory[lane].length > 2) laneHistory[lane].shift();
+                            }
+
+                            generatedBeats.push({
+                                time: currentTimeMs,
+                                lane: lane,
+                                endTime: noteEndTime,
+                                hit: false,
+                                held: false,
+                                element: null
+                            });
+                        }
+                    }
+                }
+                prevEnergy = energy;
+            }
+            return generatedBeats;
+        }
+
+        // ==========================================
+        // GAME INITIALIZATION
+        // ==========================================
+        async function initGame(mode) {
+            if (!audioInput.files[0]) return alert("Please upload an audio file first!");
+            
+            const audioFile = audioInput.files[0];
+            const fileURL = URL.createObjectURL(audioFile);
+            audio.src = fileURL;
+
+            if (audioFile.type.startsWith('video/')) {
+                audio.classList.remove('hidden');
+            } else {
+                audio.classList.add('hidden');
+            }
+            
+            score = 0;
+            health = 100;
+            combo = 0;
+            maxCombo = 0;
+            multiplier = 1;
+            stats = { PERFECT: 0, EXCELLENT: 0, GREAT: 0, GOOD: 0, MISS: 0 };
+            
+            document.getElementById('retry-btn').onclick = () => initGame(mode);
+
+            mapLyrics = [];
+            recordedLyrics = [];
+            updateHealthUI();
+            document.getElementById('score-display').innerText = `Score: 0`;
+            document.getElementById('lyrics-display').innerText = "";
+            isPaused = false;
+            
+            if (lyricsInput.files[0]) {
+                await loadLyricsData(lyricsInput.files[0]);
+            }
+
+            if (mode === 'play') {
+                if (dataInput.files[0]) {
+                    loadGameData(dataInput.files[0]);
+                } else {
+                    document.getElementById('countdown').innerText = "Analyzing...";
+                    mapNotes = await analyzeAudio(audioFile, sensitivityInput.value);
+                    startGameFlow();
+                }
+            } else if (mode === 'record') {
+                gameState = 'record';
+                recordedNotes = [];
+                document.getElementById('setup-menu').classList.add('hidden');
+                document.getElementById('recording-ui').classList.remove('hidden');
+                startAudio();
+            } else if (mode === 'lyrics') {
+                gameState = 'lyrics-record';
+                recordedLyrics = [];
+                updateLyricsPreview();
+                document.getElementById('setup-menu').classList.add('hidden');
+                document.getElementById('lyrics-recording-ui').classList.remove('hidden');
+                startAudio();
+            }
+        }
+
+        function loadGameData(file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const lines = e.target.result.split('\n');
+                mapNotes = lines.map(line => {
+                    const [time, lane, endTime] = line.split(',');
+                    return { 
+                        time: parseFloat(time), 
+                        lane: parseInt(lane), 
+                        endTime: endTime ? parseFloat(endTime) : null, 
+                        hit: false, held: false, element: null 
+                    };
+                }).filter(n => !isNaN(n.time));
+                startGameFlow();
+            };
+            reader.readAsText(file);
+        }
+
+        function loadLyricsData(file) {
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const lines = e.target.result.split('\n');
+                    mapLyrics = lines.map(line => {
+                        const commaIndex = line.indexOf(',');
+                        if (commaIndex === -1) return null;
+                        const time = parseFloat(line.substring(0, commaIndex));
+                        const text = line.substring(commaIndex + 1).trim();
+                        return { time, text };
+                    }).filter(l => l !== null && !isNaN(l.time));
+                    resolve();
+                };
+                reader.readAsText(file);
+            });
+        }
+
+        function startGameFlow() {
+            gameState = 'play';
+            document.getElementById('ui-layer').classList.add('hidden');
+            document.getElementById('ingame-ui').classList.remove('hidden');
+            document.getElementById('health-bar-container').classList.remove('hidden');
+            document.getElementById('song-progress-container').classList.remove('hidden');
+            document.getElementById('result-screen').classList.add('hidden');
+            startAudio();
+        }
+
+        function updateHealthUI() {
+            const healthBar = document.getElementById('health-bar');
+            if (healthBar) healthBar.style.width = `${health}%`;
+        }
+
+        function togglePause() {
+            if (gameState === 'menu' || gameState === 'result') return;
+
+            isPaused = !isPaused;
+            const pauseBtn = document.getElementById('pause-btn');
+            const entryArea = document.getElementById('lyric-entry-area');
+            const input = document.getElementById('active-lyric-input');
+
+            if (isPaused) {
+                audio.pause();
+                pauseBtn.innerText = "Resume";
+
+                if (gameState === 'lyrics-record') {
+                    entryArea.classList.remove('hidden');
+                    document.getElementById('current-lyric-ts').innerText = (audio.currentTime * 1000).toFixed(0);
+                    input.value = "";
+                    setTimeout(() => input.focus(), 50);
+                }
+            } else {
+                pauseBtn.innerText = "Pause";
+                if (gameState === 'lyrics-record') entryArea.classList.add('hidden');
+
+                lastFrameTime = performance.now();
+                if (internalTime >= 0 && !audio.ended) {
+                    audio.play().catch(console.error);
+                }
+            }
+        }
+
+        function exitGame() {
+            isPaused = false;
+            gameState = 'menu';
+            audio.pause();
+            audio.currentTime = 0;
+            
+            // Cleanup UI
+            document.getElementById('ui-layer').classList.remove('hidden');
+            document.getElementById('setup-menu').classList.remove('hidden');
+            document.getElementById('recording-ui').classList.add('hidden');
+            document.getElementById('lyrics-recording-ui').classList.add('hidden');
+            document.getElementById('ingame-ui').classList.add('hidden');
+            document.getElementById('countdown').innerText = "";
+            document.getElementById('song-progress-container').classList.add('hidden');
+            document.getElementById('song-progress-fill').style.width = '0%';
+            document.getElementById('result-screen').classList.add('hidden');
+            audio.classList.add('hidden');
+            document.getElementById('health-bar-container').classList.add('hidden');
+            document.getElementById('pause-btn').innerText = "Pause";
+            document.getElementById('combo-counter').innerText = "";
+            document.getElementById('lyrics-display').innerText = "";
+            updateComboEffects();
+            
+            // Remove all note elements
+            mapNotes.forEach(note => {
+                if (note.element) {
+                    note.element.remove();
+                    note.element = null;
+                }
+            });
+            
+            mapNotes = [];
+            recordedNotes = [];
+            recordedLyrics = [];
+            mapLyrics = [];
+            activeHoldNotes = {};
+        }
+
+        function showResultScreen(title) {
+            gameState = 'result';
+            audio.pause();
+            
+            document.getElementById('result-screen').classList.remove('hidden');
+            document.getElementById('result-title').innerText = title;
+            document.getElementById('result-final-score').innerText = `Final Score: ${score}`;
+            
+            const statsContainer = document.getElementById('result-stats');
+            statsContainer.innerHTML = `
+                <div class="stat-line clr-perfect">PERFECT: ${stats.PERFECT}</div>
+                <div class="stat-line clr-excellent">EXCELLENT: ${stats.EXCELLENT}</div>
+                <div class="stat-line clr-great">GREAT: ${stats.GREAT}</div>
+                <div class="stat-line clr-good">GOOD: ${stats.GOOD}</div>
+                <div class="stat-line clr-miss">MISS: ${stats.MISS}</div>
+                <div class="stat-line" style="color: #fff; margin-top: 10px; border-top: 1px solid #444; padding-top: 10px;">MAX COMBO: ${maxCombo}</div>
+            `;
+
+            // Hide in-game UI elements
+            document.getElementById('ingame-ui').classList.add('hidden');
+            document.getElementById('health-bar-container').classList.add('hidden');
+        }
+
+        function startAudio() {
+            // Ensure lanes are clear
+            lanes.forEach(lane => {
+                const existingNotes = lane.querySelectorAll('.note');
+                existingNotes.forEach(n => n.remove());
+            });
+
+            audio.play().then(() => {
+                audio.pause();
+                audio.currentTime = 0;
+            }).catch(e => console.log("Audio unlock required"));
+
+            audio.volume = 0;
+            internalTime = -3000; 
+            lastFrameTime = performance.now();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // ==========================================
+        // MAIN GAME LOOP
+        // ==========================================
+        function gameLoop(now) {
+            const dt = now - lastFrameTime;
+            lastFrameTime = now;
+
+            if (gameState === 'play' || gameState === 'record' || gameState === 'lyrics-record') {
+                if (isPaused) return requestAnimationFrame(gameLoop);
+
+                internalTime += dt;
+                let currentTime = internalTime;
+                
+                const countdownEl = document.getElementById('countdown');
+                if (internalTime < 0) {
+                    countdownEl.innerText = Math.abs(Math.ceil(internalTime / 1000));
+                } else {
+                    if (health <= 0) {
+                        showResultScreen("Game Over");
+                        return;
+                    }
+                    countdownEl.innerText = "";
+                    if (audio.paused && !audio.ended) {
+                        audio.play().catch(console.error);
+                    }
+                    currentTime = getCurrentTime();
+                    if (audio.ended) {
+                        showResultScreen("Song Completed");
+                        return;
+                    }
+                }
+
+                if (gameState === 'record' || gameState === 'lyrics-record') {
+                    updateToolProgress();
+                }
+
+                // Volume Fades
+                const targetVolume = isAutoPlay ? autoPlayVolumeLevel : 1.0;
+                if (internalTime >= 0 && internalTime < 2000) {
+                    audio.volume = (internalTime / 2000) * targetVolume;
+                } else if (internalTime >= 2000) {
+                    const fadeOutThreshold = 3000;
+                    if (!isNaN(audio.duration)) {
+                        const songDurationMs = audio.duration * 1000;
+                        const remaining = songDurationMs - currentTime;
+                        if (remaining < fadeOutThreshold) {
+                            audio.volume = Math.max(0, (remaining / fadeOutThreshold) * targetVolume);
+                        } else {
+                            audio.volume = targetVolume;
+                        }
+                    }
+                }
+
+                if (gameState === 'play') {
+                    updateNotes(currentTime);
+                    updateLyrics(currentTime);
+                    updateSongProgress();
+                }
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        function getCurrentTime() {
+            if (gameState === 'menu' || gameState === 'result') return 0;
+            if (internalTime < 0) return internalTime;
+            
+            // Use the offset consistently across all interactive modes (Play and Record)
+            return (audio.currentTime * 1000) + timingOffset;
+        }
+
+        function updateLyrics(currentTime) {
+            if (!mapLyrics.length) return;
+            const activeLyric = mapLyrics.reduce((prev, curr) => {
+                return (curr.time <= currentTime) ? curr : prev;
+            }, null);
+            
+            document.getElementById('lyrics-display').innerText = activeLyric ? activeLyric.text : "";
+        }
+
+        function createBurst(laneIdx, color) {
+            const lane = lanes[laneIdx];
+            for (let i = 0; i < 10; i++) {
+                const p = document.createElement('div');
+                p.className = 'particle';
+                p.style.backgroundColor = color;
+                const angle = Math.random() * Math.PI * 2;
+                const dist = 40 + Math.random() * 60;
+                p.style.setProperty('--tx', `${Math.cos(angle) * dist}px`);
+                p.style.setProperty('--ty', `${Math.sin(angle) * dist}px`);
+                p.style.left = '50%';
+                p.style.bottom = '75px';
+                lane.appendChild(p);
+                setTimeout(() => p.remove(), 500);
+            }
+        }
+
+        function createSparkle(laneIdx, color) {
+            const lane = lanes[laneIdx];
+            const p = document.createElement('div');
+            p.className = 'particle';
+            p.style.width = '5px'; p.style.height = '5px';
+            p.style.backgroundColor = color;
+            p.style.boxShadow = `0 0 8px ${color}`;
+            const angle = (Math.random() - 0.5) * Math.PI;
+            const dist = 30 + Math.random() * 40;
+            p.style.setProperty('--tx', `${Math.sin(angle) * dist}px`);
+            p.style.setProperty('--ty', `-${Math.cos(angle) * dist}px`);
+            p.style.left = '50%';
+            p.style.bottom = '60px';
+            lane.appendChild(p);
+            setTimeout(() => p.remove(), 400);
+        }
+
+        function showClassification(type, laneIdx) {
+            const lane = lanes[laneIdx];
+            const div = document.createElement('div');
+            div.className = `classification clr-${type.toLowerCase()}`;
+            div.innerText = type.toUpperCase();
+            stats[type.toUpperCase()]++;
+            lane.appendChild(div);
+            setTimeout(() => div.remove(), 500);
+        }
+
+        function updateStageProgressBar(pct) {
+            const bar = document.getElementById('stage-progress-bar');
+            if (bar) {
+                bar.style.strokeDasharray = `${pct * 100} 100`;
+            }
+        }
+
+        function playRandomKeyboardSound() {
+            if (!keyboardSFXEnabled) return;
+            const randomIndex = Math.floor(Math.random() * 32) + 1;
+            const sound = new Audio(`sounds/sound${randomIndex}.wav`);
+            sound.play().catch(() => {});
+        }
+
+        function updateNotes(currentTime) {
+            const spawnTimeOffset = (window.innerHeight / NOTE_SPEED) * 1000;
+
+            mapNotes.forEach(note => {
+                // SPAWN NOTE
+                if (!note.element && currentTime > note.time - spawnTimeOffset && !note.hit) {
+                    const el = document.createElement('div');
+                    el.className = `note note-${note.lane}`;
+                    if (!note.endTime) el.classList.add('tap');
+                    lanes[note.lane].appendChild(el);
+                    note.element = el;
+                }
+
+                // AUTO PLAY LOGIC
+                if (isAutoPlay && !note.hit && currentTime >= note.time) {
+                    playRandomKeyboardSound();
+                    handleLanePress(note.lane);
+                    if (!note.endTime) {
+                        // Briefly show the press effect for tap notes
+                        setTimeout(() => handleLaneRelease(note.lane), 100);
+                    }
+                }
+                if (isAutoPlay && note.held && note.endTime && currentTime >= note.endTime) {
+                    handleLaneRelease(note.lane);
+                }
+
+                // MOVE NOTE
+                if (note.element) {
+                    const distToHit = (note.time - currentTime) / 1000 * NOTE_SPEED;
+                    const visualY = window.innerHeight - 70 - distToHit - (noteHeight / 2);
+
+                    if (note.endTime) {
+                        // Long Note logic
+                        const length = (note.endTime - note.time) / 1000 * NOTE_SPEED;
+                        let currentTop = visualY - length;
+                        let currentBottom = visualY + (noteHeight / 2);
+                        const hitLineY = window.innerHeight - 70;
+
+                        // Delete part below line
+                        if (currentBottom > hitLineY) currentBottom = hitLineY;
+                        
+                        note.element.style.height = `${Math.max(0, currentBottom - currentTop)}px`;
+                        note.element.style.top = `${currentTop}px`;
+
+                        if (note.held && Math.random() > 0.4) {
+                            createSparkle(note.lane, LANE_COLORS[note.lane]);
+                        }
+
+                        // Remove if past end time
+                        if (currentTime > note.endTime + HIT_WINDOW) {
+                            if (note.held) {
+                                // They held it successfully to the end!
+                                updateScore(200);
+                            }
+                            removeNoteVisual(note);
+                        }
+                    } else {
+                        // Tap Note logic
+                        note.element.style.top = `${visualY}px`;
+                    }
+
+                    // MISS DETECTION (Head of note passed hit zone un-pressed)
+                    if (currentTime > note.time + HIT_WINDOW && !note.hit) {
+                        note.hit = true;
+                        showClassification('MISS', note.lane);
+                        resetCombo();
+                        health = Math.max(0, health - HEALTH_LOSS_MISS);
+                        updateHealthUI();
+                        note.element.style.opacity = '0.2'; // Grey out missed note
+                        if(!note.endTime) {
+                            setTimeout(() => removeNoteVisual(note), 200);
+                        }
+                    }
+                }
+            });
+        }
+
+        function removeNoteVisual(note) {
+            if(note.element) {
+                note.element.remove();
+                note.element = null;
+            }
+            note.hit = true; 
+        }
+
+        function updateScore(points) {
+            score += points * multiplier;
+            document.getElementById('score-display').innerText = `Score: ${score} ${multiplier > 1 ? '(x' + multiplier + ')' : ''}`;
+        }
+
+        function incrementCombo() {
+            combo++;
+            maxCombo = Math.max(maxCombo, combo);
+            
+            const notesPerStage = 20;
+            let stageIdx = Math.floor(combo / notesPerStage);
+            if (stageIdx > 3) stageIdx = 3; // Cap at x6 stage
+
+            multiplier = [1, 2, 4, 6][stageIdx];
+            
+            // Calculate lap progress (0.0 to 1.0)
+            let progress = (combo % notesPerStage) / notesPerStage;
+            if (stageIdx === 3) progress = 1.0; // Keep full at max stage
+            
+            updateStageProgressBar(progress);
+            
+            const comboEl = document.getElementById('combo-counter');
+            comboEl.innerText = combo > 0 ? combo : "";
+
+            // Trigger scrolling animation
+            comboEl.classList.remove('combo-animate');
+            void comboEl.offsetWidth; // Trigger reflow to restart animation
+            comboEl.classList.add('combo-animate');
+
+            updateComboEffects();
+        }
+
+        function resetCombo() {
+            combo = 0;
+            multiplier = 1;
+            updateStageProgressBar(0);
+            const comboEl = document.getElementById('combo-counter');
+            comboEl.innerText = "";
+            updateComboEffects();
+            document.getElementById('score-display').innerText = `Score: ${score}`;
+        }
+
+        function updateComboEffects() {
+            const left = document.getElementById('side-l');
+            const right = document.getElementById('side-r');
+            const bar = document.getElementById('stage-progress-bar');
+            
+            // Clear previous classes
+            left.className = 'side-effect';
+            right.className = 'side-effect';
+            if (bar) bar.style.stroke = "rgba(255,255,255,0.3)";
+            
+            if (multiplier === 2) {
+                left.classList.add('side-x2');
+                right.classList.add('side-x2');
+                if (bar) bar.style.stroke = "#add8e6";
+            } else if (multiplier === 4) {
+                left.classList.add('side-x4');
+                right.classList.add('side-x4');
+                if (bar) bar.style.stroke = "#a020f0";
+            } else if (multiplier === 6) {
+                left.classList.add('side-x6');
+                right.classList.add('side-x6');
+                if (bar) bar.style.stroke = "#ffff4d";
+            }
+        }
+
+        // ==========================================
+        // INPUT HANDLING (Taps & Holds)
+        // ==========================================
+        function handleLanePress(laneIdx) {
+            if (isPaused || gameState === 'menu' || gameState === 'result') return;
+
+            const currentTime = getCurrentTime();
+            const lanePressEffect = lanes[laneIdx].querySelector('.lane-press');
+            if (lanePressEffect) lanePressEffect.classList.add('active-press');
+            
+            if (gameState === 'record') {
+                activeHoldNotes[laneIdx] = currentTime;
+            } else if (gameState === 'play' && internalTime >= 0) {
+                // Find nearest un-hit note
+                const note = mapNotes.find(n => n.lane === laneIdx && !n.hit && Math.abs(n.time - currentTime) < HIT_WINDOW);
+                if (note) {
+                    const diff = Math.abs(note.time - currentTime);
+                    let type, points, hGain;
+                    if (diff <= WINDOWS.PERFECT) {
+                        type = 'PERFECT'; points = 100; hGain = 3;
+                    } else if (diff <= WINDOWS.EXCELLENT) {
+                        type = 'EXCELLENT'; points = 70; hGain = 2;
+                    } else if (diff <= WINDOWS.GREAT) {
+                        type = 'GREAT'; points = 40; hGain = 1;
+                    } else {
+                        type = 'GOOD'; points = 20; hGain = 0.5;
+                    }
+                    note.hit = true;
+                    showClassification(type, laneIdx);
+                    incrementCombo();
+                    updateScore(points);
+                    health = Math.min(100, health + hGain);
+                    updateHealthUI();
+                    if (note.endTime) {
+                        // Start holding a long note
+                        note.held = true;
+                        if (note.element) {
+                            note.element.style.boxShadow = '0 0 20px white';
+                            note.element.style.opacity = '0.8';
+                        }
+                    } else {
+                        // Destroy tap note
+                        if (note.element) {
+                            note.element.style.transition = 'transform 0.2s ease-out, opacity 0.2s ease-out';
+                            note.element.style.transform = 'scale(1.8)';
+                            note.element.style.opacity = '0';
+                            createBurst(laneIdx, LANE_COLORS[laneIdx]);
+                            setTimeout(() => removeNoteVisual(note), 150);
+                        }
+                    }
+                } else {
+                    // Wrong key press (Ghost tap)
+                    showClassification('MISS', laneIdx);
+                    resetCombo();
+                    health = Math.max(0, health - HEALTH_LOSS_WRONG);
+                    updateHealthUI();
+                }
+            }
+        }
+
+        function handleLaneRelease(laneIdx) {
+            if (isPaused || gameState === 'menu' || gameState === 'result') return;
+
+            const lanePressEffect = lanes[laneIdx].querySelector('.lane-press');
+            if (lanePressEffect) lanePressEffect.classList.remove('active-press');
+            
+            const currentTime = getCurrentTime();
+
+            if (gameState === 'record' && activeHoldNotes[laneIdx] !== undefined) {
+                const start = activeHoldNotes[laneIdx];
+                if (currentTime - start > 150) {
+                    recordedNotes.push(`${start.toFixed(0)},${laneIdx},${currentTime.toFixed(0)}`);
+                } else {
+                    recordedNotes.push(`${start.toFixed(0)},${laneIdx}`);
+                }
+                delete activeHoldNotes[laneIdx];
+            } else if (gameState === 'play') {
+                // Check for releasing a held note
+                const activeLongNote = mapNotes.find(n => n.lane === laneIdx && n.held);
+                if (activeLongNote) {
+                    activeLongNote.held = false;
+                    // Check if they held it long enough (within window of end time)
+                    if (Math.abs(activeLongNote.endTime - currentTime) < HIT_WINDOW + 100) {
+                        updateScore(200); // Hold bonus
+                    }
+                    if (activeLongNote.element) {
+                        activeLongNote.element.style.opacity = '0.2'; // dim it since it was released
+                    }
+                }
+            }
+        }
+
+        window.addEventListener('keydown', (e) => {
+            // Handling Keybind Capture
+            if (currentCapturingLane !== null) {
+                const newKey = e.key.toLowerCase();
+                
+                // Remove old key for this lane if it exists
+                for (let k in KEY_MAP) {
+                    if (KEY_MAP[k] === currentCapturingLane) delete KEY_MAP[k];
+                }
+                
+                KEY_MAP[newKey] = currentCapturingLane;
+                document.getElementById(`kb-${currentCapturingLane}`).innerText = newKey.toUpperCase();
+                document.getElementById(`kb-${currentCapturingLane}`).style.color = "white";
+                
+                // Update the in-game UI indicators
+                document.querySelectorAll('.key-indicator')[currentCapturingLane].innerText = newKey.toUpperCase();
+                
+                currentCapturingLane = null;
+                return;
+            }
+            
+            if (e.repeat) return; // Ignore holding key repeat events
+
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+                if (e.key === 'Enter' && e.target.id === 'active-lyric-input') {
+                    saveLyricFromInput();
+                }
+                return;
+            }
+
+            if (e.code === 'ArrowLeft' || e.code === 'ArrowRight') {
+                if ((gameState === 'record' || gameState === 'lyrics-record') && internalTime >= 0) {
+                    e.preventDefault();
+                    const direction = e.code === 'ArrowRight' ? 1 : -1;
+                    audio.currentTime = Math.max(0, Math.min(audio.duration, audio.currentTime + (5 * direction)));
+                    updateToolProgress();
+                }
+            }
+
+            if (e.code === 'Space') {
+                e.preventDefault();
+                togglePause();
+                return;
+            }
+
+            if (isPaused) return;
+
+            const key = e.key.toLowerCase();
+            if (KEY_MAP[key] === undefined) return;
+            
+            handleLanePress(KEY_MAP[key]);
+        });
+
+        window.addEventListener('keyup', (e) => {
+            const key = e.key.toLowerCase();
+            const laneIdx = KEY_MAP[key];
+            if (laneIdx !== undefined) handleLaneRelease(laneIdx);
+        });
+
+        function saveLyricFromInput() {
+            const input = document.getElementById('active-lyric-input');
+            const text = input.value.trim();
+            if (text) {
+                const ts = (audio.currentTime * 1000).toFixed(0);
+                recordedLyrics.push(`${ts},${text}`);
+                updateLyricsPreview();
+                togglePause(); // Resume
+            }
+        }
+
+        function updateSongProgress() {
+            if (!audio.duration || isNaN(audio.duration)) return;
+            const pct = (audio.currentTime / audio.duration) * 100;
+            const bar = document.getElementById('song-progress-fill');
+            if (bar) bar.style.width = pct + '%';
+        }
+
+        function updateToolProgress() {
+            if (!audio.duration || isNaN(audio.duration)) return;
+            const pct = (audio.currentTime / audio.duration) * 100;
+            const barId = gameState === 'record' ? 'record-progress-bar' : 'lyrics-progress-bar';
+            const bar = document.getElementById(barId);
+            if (bar) bar.style.width = pct + '%';
+        }
+
+        function updateLyricsPreview() {
+            const preview = document.getElementById('recorded-lyrics-preview');
+            if (recordedLyrics.length === 0) {
+                preview.innerText = "No lyrics recorded yet.";
+                return;
+            }
+            preview.innerText = recordedLyrics.join('\n');
+            preview.scrollTop = preview.scrollHeight;
+        }
+
+        function exportLyrics() {
+            audio.pause();
+            if (recordedLyrics.length === 0) return alert("No lyrics to export!");
+            const blob = new Blob([recordedLyrics.join('\n')], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'lyrics_data.txt';
+            a.click();
+            location.reload();
+        }
+
+        function exportData() {
+            audio.pause();
+            const blob = new Blob([recordedNotes.join('\n')], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'game_data.txt';
+            a.click();
+            location.reload();
+        }
+
+        function toggleKeybindMenu() {
+            const menu = document.getElementById('keybind-menu');
+            menu.classList.toggle('hidden');
+            // Update the visual keys in the menu based on the current map
+            for (let key in KEY_MAP) {
+                const el = document.getElementById(`kb-${KEY_MAP[key]}`);
+                if (el) el.innerText = key.toUpperCase();
+            }
+        }
+
+        function captureKey(laneIdx) {
+            currentCapturingLane = laneIdx;
+            const box = document.getElementById(`kb-${laneIdx}`);
+            box.innerText = "...";
+            box.style.color = "var(--yellow)";
+        }
+
+        let lastTouchEnd = 0;
+        document.addEventListener('touchend', (event) => {
+        const now = new Date().getTime();
+        if (now - lastTouchEnd <= 1000) {
+            event.preventDefault(); // Blocks the double-tap zoom
+        }
+        lastTouchEnd = now;
+        }, false);
+
+        function saveSettings() {
+            const settings = {
+                laneCount: laneCount,
+                keyMap: KEY_MAP,
+                noteSpeed: document.getElementById('note-speed-slider').value,
+                noteHeight: noteHeight,
+                autoPlayVolumeLevel: autoPlayVolumeLevel,
+                keyboardSFXEnabled: keyboardSFXEnabled,
+                timingOffset: timingOffset,
+                preventTripleTaps: preventTripleTaps
+            };
+            localStorage.setItem('rhythm_game_settings', JSON.stringify(settings));
+            alert('Settings saved successfully!');
+        }
+
+        function applyLoadedSettings(settings) {
+            if (!settings) return;
+            
+            // 1. Lane Count - this will trigger rebuildLanes and set defaults
+            if (settings.laneCount !== undefined) {
+                setLaneCount(settings.laneCount);
+            }
+            
+            // 2. Overwrite Key Map if provided
+            if (settings.keyMap) {
+                KEY_MAP = settings.keyMap;
+                // Update lane indicators in the actual game lanes
+                const indicators = document.querySelectorAll('.key-indicator');
+                // Since KEY_MAP is {key: laneIdx}, we need to map it back to laneIdx: key
+                const laneToKey = {};
+                for (let key in KEY_MAP) {
+                    laneToKey[KEY_MAP[key]] = key;
+                }
+                indicators.forEach((ind, idx) => {
+                    if (laneToKey[idx]) ind.innerText = laneToKey[idx].toUpperCase();
+                });
+                buildKeybindMenu();
+            }
+
+            // 3. Note Speed
+            if (settings.noteSpeed !== undefined) {
+                document.getElementById('note-speed-slider').value = settings.noteSpeed;
+                updateNoteSpeedUI(settings.noteSpeed);
+            }
+
+            // 4. Note Height
+            if (settings.noteHeight !== undefined) {
+                document.getElementById('note-height-slider').value = settings.noteHeight;
+                updateNoteHeightUI(settings.noteHeight);
+            }
+
+            // 5. Volume
+            if (settings.autoPlayVolumeLevel !== undefined) {
+                document.getElementById('ap-vol-slider').value = settings.autoPlayVolumeLevel;
+                updateAutoPlayVolumeUI(settings.autoPlayVolumeLevel);
+            }
+
+            // 6. SFX
+            if (settings.keyboardSFXEnabled !== undefined) {
+                keyboardSFXEnabled = settings.keyboardSFXEnabled;
+                document.getElementById('kb-sfx-checkbox').checked = keyboardSFXEnabled;
+            }
+
+            // 7. Timing Offset
+            if (settings.timingOffset !== undefined) {
+                updateOffsetUI(settings.timingOffset);
+            }
+
+            // 8. Prevent Triple Jacks
+            if (settings.preventTripleTaps !== undefined) {
+                preventTripleTaps = settings.preventTripleTaps;
+                document.getElementById('prevent-triple-taps').checked = preventTripleTaps;
+            }
+        }
+
+        window.addEventListener('load', () => {
+            const savedSettings = localStorage.getItem('rhythm_game_settings');
+            if (savedSettings) {
+                const shouldLoad = confirm("The system detected previously saved settings. Would you like to load them?");
+                if (shouldLoad) {
+                    try {
+                        applyLoadedSettings(JSON.parse(savedSettings));
+                    } catch (e) {
+                        console.error("Failed to load settings:", e);
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>
