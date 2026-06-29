@@ -1,8 +1,7 @@
 {
   "name": "List of taiyuuu.github.io features",
-  "count": 8,
-  "language": "en-US",
-  "programming_language": "HTML",
+  "count": 9,
+  "Language": "HTML",
   "base URL": "https://taiyuuu.github.io",
   "list": {
     "docs": {
@@ -17,9 +16,10 @@
       },
       "tool": {
         "Font Studio": "/FontCreate",
-        "Floor Planner": "/FllorPlanner",
+        "Floor Planner": "/FloorPlanner",
         "File Converter": "/Convert",
-        "Better Calculator/Math Environment": "/mathOS"
+        "Better Calculator/Math Environment": "/mathOS",
+        "Among Us Detective": "/AmongUsDetective"
       },
       "game": {
         "Connect 4": "/Connect-4",
