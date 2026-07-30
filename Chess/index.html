@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chess.io — Embedded Stockfish & Maia-3 Arcade Engine</title>
+    <style>
+        :root {
+            --bg-primary: #0a0d14;
+            --bg-secondary: #121824;
+            --bg-card: #1a2234;
+            --accent-gold: #f59e0b;
+            --accent-cyan: #06b6d4;
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+            --border-color: #273549;
+            --font-code: 'Fira Code', 'Courier New', Courier, monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-main);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            padding: 0;
+            margin: 0;
+        }
+
+        header {
+            background: linear-gradient(135deg, #1e1b4b 0%, #121824 100%);
+            border-bottom: 1px solid var(--border-color);
+            padding: 3rem 1.5rem;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        header::after {
+            content: "";
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--accent-cyan), var(--accent-gold), var(--accent-green));
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 2rem 1.5rem;
+        }
+
+        h1 {
+            font-size: 2.8rem;
+            font-weight: 800;
+            letter-spacing: -0.025em;
+            color: #ffffff;
+            margin-bottom: 0.5rem;
+        }
+
+        h1 span {
+            color: var(--accent-gold);
+        }
+
+        .subtitle {
+            font-size: 1.25rem;
+            color: var(--accent-cyan);
+            max-width: 700px;
+            margin: 0 auto 1.5rem auto;
+            font-weight: 500;
+        }
+
+        .badge-container {
+            display: flex;
+            justify-content: center;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        .badge {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            padding: 0.35rem 0.85rem;
+            border-radius: 9999px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+
+        .badge.cyan { color: var(--accent-cyan); border-color: rgba(6, 182, 212, 0.3); }
+        .badge.gold { color: var(--accent-gold); border-color: rgba(245, 158, 11, 0.3); }
+        .badge.green { color: var(--accent-green); border-color: rgba(16, 185, 129, 0.3); }
+
+        section {
+            margin-bottom: 3.5rem;
+        }
+
+        h2 {
+            font-size: 1.8rem;
+            color: #ffffff;
+            margin-bottom: 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 0.5rem;
+        }
+
+        h2::before {
+            content: "";
+            display: inline-block;
+            width: 8px;
+            height: 1.5rem;
+            background-color: var(--accent-gold);
+            border-radius: 2px;
+        }
+
+        p {
+            margin-bottom: 1rem;
+            color: var(--text-muted);
+            font-size: 1.05rem;
+        }
+
+        /* Hero Features Grid */
+        .grid-3 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-top: 1.5rem;
+        }
+
+        .card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.5rem;
+            transition: transform 0.2s ease, border-color 0.2s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-4px);
+            border-color: var(--accent-cyan);
+        }
+
+        .card-icon {
+            font-size: 2rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .card h3 {
+            font-size: 1.3rem;
+            color: #ffffff;
+            margin-bottom: 0.5rem;
+        }
+
+        .card p {
+            font-size: 0.95rem;
+            margin-bottom: 0;
+        }
+
+        /* System Architecture Section */
+        .arch-diagram {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 2rem;
+            margin: 1.5rem 0;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            align-items: center;
+        }
+
+        .arch-flow {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+            gap: 1rem;
+            width: 100%;
+        }
+
+        .arch-node {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1rem 1.25rem;
+            text-align: center;
+            min-width: 180px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+        }
+
+        .arch-node.highlight-gold { border-color: var(--accent-gold); }
+        .arch-node.highlight-cyan { border-color: var(--accent-cyan); }
+        .arch-node.highlight-green { border-color: var(--accent-green); }
+
+        .arch-node h4 {
+            color: #ffffff;
+            font-size: 1rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .arch-node span {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            display: block;
+        }
+
+        .arch-arrow {
+            color: var(--accent-gold);
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+
+        /* Virtual Console Simulator */
+        .console-wrapper {
+            background-color: #05070a;
+            border: 2px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.7);
+            margin: 2rem 0;
+        }
+
+        .console-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 0.75rem;
+            margin-bottom: 1rem;
+        }
+
+        .console-title {
+            font-family: var(--font-code);
+            color: var(--accent-gold);
+            font-size: 0.9rem;
+            letter-spacing: 0.05em;
+        }
+
+        .console-screen {
+            background-color: #000000;
+            border-radius: 6px;
+            padding: 1.25rem;
+            font-family: var(--font-code);
+            font-size: 0.95rem;
+            color: #ffffff;
+            line-height: 1.4;
+            min-height: 220px;
+            white-space: pre;
+            overflow-x: auto;
+            border: 1px solid #1f2937;
+        }
+
+        .controls-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1.5rem;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .controls-table th, .controls-table td {
+            padding: 0.85rem 1.25rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .controls-table th {
+            background-color: var(--bg-card);
+            color: #ffffff;
+            font-weight: 600;
+        }
+
+        .controls-table td {
+            color: var(--text-muted);
+        }
+
+        .key-badge {
+            background: #2b384e;
+            color: var(--accent-gold);
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-family: var(--font-code);
+            font-size: 0.85rem;
+            font-weight: 700;
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
+
+        /* Issues Callout */
+        .issue-box {
+            background: rgba(239, 68, 68, 0.08);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-left: 4px solid var(--accent-red);
+            border-radius: 8px;
+            padding: 1.25rem;
+            margin-bottom: 1.25rem;
+        }
+
+        .issue-box h4 {
+            color: #fca5a5;
+            font-size: 1.1rem;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .warning-box {
+            background: rgba(245, 158, 11, 0.08);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+            border-left: 4px solid var(--accent-gold);
+            border-radius: 8px;
+            padding: 1.25rem;
+            margin-bottom: 1.25rem;
+        }
+
+        .warning-box h4 {
+            color: #fde047;
+            font-size: 1.1rem;
+            margin-bottom: 0.5rem;
+        }
+
+        code {
+            font-family: var(--font-code);
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--accent-cyan);
+            padding: 0.15rem 0.4rem;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+
+        footer {
+            text-align: center;
+            padding: 2.5rem;
+            border-top: 1px solid var(--border-color);
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            background-color: var(--bg-secondary);
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="container">
+            <h1>Chess.io <span>Chess Platform</span></h1>
+            <p class="subtitle">A full-featured handheld chess emulator running Stockfish 18 & Maia-3 human-like neural network AI.</p>
+            <div class="badge-container">
+                <span class="badge cyan">FastAPI + Docker</span>
+                <span class="badge gold">Maia-3 Human AI</span>
+                <span class="badge green">Stockfish Analysis</span>
+                <span class="badge">Firebase REST Storage</span>
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+
+        <!-- System Overview -->
+        <section>
+            <h2>System Introduction</h2>
+            <p><strong>Chess.io</strong> is a lightweight, embedded-focused Python chess engine designed for handheld gaming microcontrollers (e.g., PyBadge, ESP32 Python runtimes, or retro handheld consoles). It transforms minimalist text display screens into a competitive chess console with full FEN validation, move history tracking, cloud synchronization, and dual engine support.</p>
+            
+            <div class="grid-3">
+                <div class="card">
+                    <div class="card-icon">🧠</div>
+                    <h3>Maia-3 AI Engine</h3>
+                    <p>Integrates human-like AI trained on millions of online games to match human mistake profiles at custom ELO levels (600 - 2600).</p>
+                </div>
+                <div class="card">
+                    <div class="card-icon">⚡</div>
+                    <h3>Stockfish Integration</h3>
+                    <p>Connects via REST API to evaluate board positions, compute win probabilities, and provide dynamic move hints in real time.</p>
+                </div>
+                <div class="card">
+                    <div class="card-icon">☁️</div>
+                    <h3>Cloud Game Replay</h3>
+                    <p>Stores completed games on Firebase with unique game IDs. Allows full step-by-step PGN board replay directly on the device console.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Technical Architecture -->
+        <section>
+            <h2>Architecture & How It's Made</h2>
+            <p>The system is split into a **Client Controller** (running on the handheld hardware) and a **Cloud AI Backend** deployed on Render via Docker.</p>
+            
+            <div class="arch-diagram">
+                <div class="arch-flow">
+                    <div class="arch-node highlight-cyan">
+                        <h4>Hardware Device</h4>
+                        <span>Stockfish-Maia.py UI</span>
+                    </div>
+                    <div class="arch-arrow">➔</div>
+                    <div class="arch-node highlight-gold">
+                        <h4>Render Cloud API</h4>
+                        <span>FastAPI + Uvicorn Container</span>
+                    </div>
+                    <div class="arch-arrow">➔</div>
+                    <div class="arch-node highlight-green">
+                        <h4>Maia-3 UCI Process</h4>
+                        <span>maia3-5m PyTorch Weights</span>
+                    </div>
+                </div>
+                <div class="arch-flow" style="margin-top: 1rem;">
+                    <div class="arch-node">
+                        <h4>Stockfish REST API</h4>
+                        <span>chess-api.com Evaluation</span>
+                    </div>
+                    <div class="arch-arrow">◄═►</div>
+                    <div class="arch-node highlight-cyan">
+                        <h4>Client Controller</h4>
+                        <span>Local Legal-Move Generator</span>
+                    </div>
+                    <div class="arch-arrow">◄═►</div>
+                    <div class="arch-node">
+                        <h4>Firebase RTDB</h4>
+                        <span>PGN Movetext Storage</span>
+                    </div>
+                </div>
+            </div>
+
+            <p>Key technical components include:</p>
+            <ul style="margin-left: 2rem; color: var(--text-muted); margin-bottom: 1rem;">
+                <li><strong>Local Move Engine:</strong> Custom mathematical implementation of pseudo-legal move generation, king check verification, castling, and en passant logic written in pure Python without heavy external library requirements on the microcontroller.</li>
+                <li><strong>FastAPI Microservice:</strong> Encapsulates <code>maia3-uci</code> using Python's <code>chess.engine</code> module, protected by custom API keys (<code>X-API-Key</code>).</li>
+                <li><strong>Hybrid Eval Pipeline:</strong> Because Maia-3 focuses purely on human move prediction, every Maia move automatically triggers a background Stockfish evaluation query to update the UI's centipawn eval and win chance meters.</li>
+            </ul>
+        </section>
+
+        <!-- How to Use / Controls -->
+        <section>
+            <h2>How to Play & Controls</h2>
+            <p>The hardware interface relies on standard 4-way direction buttons plus <code>A</code> (Select/Action) and <code>B</code> (Cancel/Menu).</p>
+
+            <table class="controls-table">
+                <thead>
+                    <tr>
+                        <th>Context</th>
+                        <th>Input / Button</th>
+                        <th>Action Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Start Menu</td>
+                        <td><span class="key-badge">A</span> / <span class="key-badge">B</span></td>
+                        <td>Start Game / View Help Menu</td>
+                    </tr>
+                    <tr>
+                        <td>Start Menu</td>
+                        <td><span class="key-badge">LEFT</span> / <span class="key-badge">RIGHT</span></td>
+                        <td>Open Options Settings / View Saved Cloud Games</td>
+                    </tr>
+                    <tr>
+                        <td>In-Game</td>
+                        <td><span class="key-badge">ARROWS</span></td>
+                        <td>Move cursor across the 8x8 chessboard grid</td>
+                    </tr>
+                    <tr>
+                        <td>In-Game</td>
+                        <td><span class="key-badge">A</span></td>
+                        <td>First press selects piece; second press confirms destination square</td>
+                    </tr>
+                    <tr>
+                        <td>In-Game</td>
+                        <td><span class="key-badge">B</span></td>
+                        <td>Open Pause Menu (Access Hint, Resign, or Resume)</td>
+                    </tr>
+                    <tr>
+                        <td>Replay Mode</td>
+                        <td><span class="key-badge">LEFT</span> / <span class="key-badge">RIGHT</span></td>
+                        <td>Step backward / forward through game move history</td>
+                    </tr>
+                    <tr>
+                        <td>Replay Mode</td>
+                        <td><span class="key-badge">A</span> / <span class="key-badge">B</span></td>
+                        <td>Request Stockfish best move hint for current board / Exit replay</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- Common Issues & Troubleshooting -->
+        <section>
+            <h2>Common Issues & Troubleshooting</h2>
+
+            <div class="warning-box">
+                <h4>1. Initial API Request Delays (Server Cold Start / Sleep)</h4>
+                <p><strong>Symptom:</strong> When making the first move against Maia-3 after several minutes of inactivity, the device may freeze or feel unresponsive for 30–50 seconds.</p>
+                <p><strong>Cause:</strong> The free tier on Render automatically spins down Web Services after 15 minutes of inactivity. When a new move is requested, the server must wake up, load PyTorch, and cache the <code>maia3-5m</code> model weights into memory.</p>
+                <p><strong>Workaround / Solution:</strong> Send a health-check ping to <code>/health</code> when opening the game, or configure a periodic cron job (e.g. via UptimeRobot) to ping your endpoint every 10 minutes to keep the server warm.</p>
+            </div>
+
+            <div class="issue-box">
+                <h4>2. "API request failed: 500 Internal Server Error"</h4>
+                <p><strong>Cause:</strong> Usually caused if the underlying UCI engine process fails to start or if <code>maia3-uci</code> binary permissions are revoked during continuous container deployment.</p>
+                <p><strong>Solution:</strong> Ensure your <code>Dockerfile</code> includes <code>RUN chmod +x /app/maia3-uci</code> and verify that <code>shutil.which("maia3-uci")</code> properly detects the executable in PATH.</p>
+            </div>
+
+            <div class="issue-box">
+                <h4>3. "Illegal Move!" Message on Custom Replay</h4>
+                <p><strong>Cause:</strong> Happens if PGN movetext contains non-standard notation or broken castling rights when importing games recorded outside of Chess.io.</p>
+                <p><strong>Solution:</strong> Ensure games saved to Firebase are constructed strictly using the device's built-in <code>build_pgn_movetext()</code> exporter.</p>
+            </div>
+        </section>
+
+    </div>
+
+    <footer>
+        <p>Chess.io Chess Platform — Built with Python, FastAPI, Stockfish, and Maia-3 Neural Networks.</p>
+    </footer>
+
+</body>
+</html>
